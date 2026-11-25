@@ -114,7 +114,7 @@
     const s = pane.s, v = volOf(s), im = v.pdf_img;
     const out = [];
     for (let p = pane.lo; p <= pane.hi; p++) {
-      out.push(`<figure class="pp-page" data-page="${p}"><button type="button" class="pp-zoomable" data-act="pp-detail" data-page="${p}" aria-label="${esc(pageLabel(s, p))} 크게 보기"><img src="pdf-img/${v.id}/${pad3(p)}.webp" width="${im.w}" height="${im.h}" loading="lazy" decoding="async" alt="원문 ${esc(pageLabel(s, p))}"></button><figcaption>${esc(pageLabel(s, p))}${p === s.pdf ? ' — 이 절이 시작하는 쪽' : ''}</figcaption></figure>`);
+      out.push(`<figure class="pp-page" data-page="${p}"><button type="button" class="pp-zoomable" data-act="pp-detail" data-page="${p}" aria-label="${esc(pageLabel(s, p))} 크게 보기"><img src="pdf-img/${v.id}/${pad3(p)}.webp" width="${im.w}" height="${im.h}" loading="lazy" decoding="async" alt="원문 ${esc(pageLabel(s, p))}"></button><figcaption>${esc(pageLabel(s, p))}${p === s.pdf ? ' · 이 절 시작' : ''}</figcaption></figure>`);
     }
     return out.join('');
   }
@@ -158,7 +158,8 @@
     el.className = 'pdfpane';
     el.setAttribute('aria-label', '원문 쪽');
     if (modal) { el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); }
-    el.innerHTML = `<div class="pp-head">
+    el.innerHTML = `<div class="pp-resize" role="separator" aria-orientation="vertical" aria-label="원문 창 폭 조절 (←·→, Home은 기본 폭)" aria-valuemin="${PANE_MIN}" tabindex="0" title="끌어서 폭 조절 · 두 번 누르면 기본 폭"></div>
+      <div class="pp-head">
         <div class="pp-title"><strong>원문 쪽</strong><span class="muted" data-pp="label"></span></div>
         <span class="pp-tools">
           <button type="button" class="icon-btn" data-act="pp-prev" aria-label="이전 쪽">‹</button>
@@ -170,6 +171,19 @@
       <div class="pp-body">${paneFigures()}</div>`;
     main.appendChild(el);
     main.classList.add('with-pdf');
+    paneApplyWidth();
+    const grip = el.querySelector('.pp-resize');
+    grip.addEventListener('pointerdown', paneResizeStart);
+    grip.addEventListener('dblclick', () => { store.set('krc.pdfpaneW', '0'); paneApplyWidth(); });
+    grip.addEventListener('keydown', paneResizeKey);
+    // 창 높이가 바뀌면(크기 바꾸기·최대화·브라우저 확대) 쪽 맞춤 폭을 다시 — 원문 창 높이를 직접 지켜본다
+    if (window.ResizeObserver) {
+      let lastH = 0;
+      new ResizeObserver((entries) => {
+        const h = Math.round(entries[0].contentRect.height);
+        if (Math.abs(h - lastH) > 1) { lastH = h; paneApplyWidth(); }
+      }).observe(el);
+    }
     document.documentElement.classList.toggle('pdf-modal', modal);
     const body = el.querySelector('.pp-body');
     body.addEventListener('scroll', () => {   // 보고 있는 쪽을 머리줄에 표시
@@ -183,6 +197,66 @@
     setToggle(true);
     if (modal) el.querySelector('[data-act="pp-close"]').focus();
   }
+  /* 원문 창 폭 — 기본은 '쪽 하나가 창 높이에 통째로 들어가는 가장 큰 폭', 왼쪽 가장자리를 끌면 바꾸고 기억(두 번 누르면 기본) */
+  const PANE_MIN = 300;
+  const paneMax = () => Math.round(window.innerWidth * 0.6);
+  function paneFitWidth() {
+    const el = paneEl();
+    const im = volOf(pane.s).pdf_img;
+    const head = el.querySelector('.pp-head').offsetHeight;
+    const capEl = el.querySelector('.pp-page figcaption');
+    const cap = (capEl ? capEl.offsetHeight : 38) + 4, pad = 28, border = 2, scrollbar = 14;   // 쪽 아래 글줄, 창 안쪽 여백, 테두리, 스크롤 막대
+    const availH = window.innerHeight - 24 - head - pad - cap - border;
+    return Math.round(availH * (im.w / im.h) + pad + border + scrollbar);
+  }
+  function paneApplyWidth() {
+    const el = paneEl();
+    if (!el || !wide(1100)) { if (el) el.style.flexBasis = ''; return; }
+    const saved = +store.get('krc.pdfpaneW', '0');
+    let w = 0;
+    for (let i = 0; i < 2; i++) {   // 폭이 바뀌면 머리줄 높이도 바뀌므로 한 번 더 맞춘다
+      w = Math.max(PANE_MIN, Math.min(paneMax(), saved || paneFitWidth()));
+      el.style.flexBasis = `${w}px`;
+      if (saved) break;
+    }
+    const h = el.querySelector('.pp-resize');
+    if (h) { h.setAttribute('aria-valuenow', String(w)); h.setAttribute('aria-valuemax', String(paneMax())); }
+  }
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(paneApplyWidth, 120); });
+  function paneResizeStart(e) {
+    const el = paneEl();
+    if (!el || e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    document.documentElement.classList.add('pp-resizing');
+    const right = el.getBoundingClientRect().right;
+    const move = (ev) => {
+      const w = Math.max(PANE_MIN, Math.min(paneMax(), Math.round(right - ev.clientX)));
+      el.style.flexBasis = `${w}px`;
+      handle.setAttribute('aria-valuenow', String(w));
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      document.documentElement.classList.remove('pp-resizing');
+      store.set('krc.pdfpaneW', String(Math.round(el.getBoundingClientRect().width)));
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up, { once: true });
+    handle.addEventListener('pointercancel', up, { once: true });
+  }
+  function paneResizeKey(e) {   // 키보드: ←·→ 40px씩, Home=기본 폭
+    const el = paneEl();
+    if (!el) return;
+    if (e.key === 'Home') { store.set('krc.pdfpaneW', '0'); paneApplyWidth(); e.preventDefault(); return; }
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const w = Math.max(PANE_MIN, Math.min(paneMax(), el.getBoundingClientRect().width + (e.key === 'ArrowLeft' ? 40 : -40)));
+    store.set('krc.pdfpaneW', String(Math.round(w)));
+    paneApplyWidth();
+  }
+
   /* 크게 보기: 쪽 하나를 화면 가득 — 이전·다음(←·→), 크기 3단계, PDF로 열기, 닫기(Esc) */
   const detailEl = () => app.querySelector('.pdfzoom');
   function detailShow() {

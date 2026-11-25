@@ -321,9 +321,14 @@ button.cite:hover { background: var(--primary-10); }
 .btn.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn.on:hover { background: var(--primary-dk); color: #fff; }
 .page.with-pdf { max-width: none; flex-wrap: nowrap; }
-.pdfpane { flex: 0 0 clamp(320px, 30vw, 440px); min-width: 0; position: sticky; top: 12px; height: calc(100vh - 24px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.pp-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); }
-.pp-title { display: flex; flex-direction: column; line-height: 1.35; }
+.pdfpane { flex: 0 0 440px; min-width: 0; position: sticky; top: 12px; height: calc(100vh - 24px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+/* 왼쪽 가장자리 손잡이: 끌어서 폭 조절 */
+.pp-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 10px; cursor: col-resize; z-index: 2; touch-action: none; }
+.pp-resize::after { content: ''; position: absolute; left: 3px; top: 50%; width: 4px; height: 44px; margin-top: -22px; border-radius: 2px; background: var(--btn-line); }
+.pp-resize:hover::after, .pp-resize:focus-visible::after { background: var(--primary); }
+html.pp-resizing, html.pp-resizing * { cursor: col-resize !important; user-select: none !important; }
+.pp-head { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); }
+.pp-title { display: flex; flex-direction: column; line-height: 1.35; flex: 1; min-width: 0; }   /* 제목만 줄바꿈 — 머리줄은 한 줄(높이가 일정해야 쪽 맞춤 폭이 맞다) */
 .pp-title .muted { font-size: 0.9375rem; }
 .pp-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .pp-tools .icon-btn { font-size: 1.25rem; }
@@ -333,7 +338,7 @@ button.cite:hover { background: var(--primary-10); }
 .pp-page img { display: block; width: 100%; height: auto; }
 .pp-zoomable { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .pp-zoomable:hover img { outline: 2px solid var(--primary); outline-offset: -2px; }
-.pp-page figcaption { font-size: 0.9375rem; color: var(--muted); text-align: center; padding: 6px; }
+.pp-page figcaption { font-size: 0.9375rem; color: var(--muted); text-align: center; padding: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pp-page.cur figcaption { color: var(--primary-dk); font-weight: 700; }
 /* 본문의 그림 자리 → 원문 쪽 창으로 가는 단추 */
 .figph .fh-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -352,11 +357,10 @@ html.pdf-detail, html.pdf-detail body { overflow: hidden; }
 @media (max-width: 1100px) {
   .pdfpane { position: fixed; inset: 0; z-index: 300; height: auto; border: 0; border-radius: 0; }
   html.pdf-modal, html.pdf-modal body { overflow: hidden; }   /* 뒤의 본문이 같이 밀리지 않게 */
-  .pp-detail { display: none; }   /* 폰·태블릿은 창이 이미 화면 전체 — 손가락으로 확대 */
+  .pp-detail, .pp-resize { display: none; }   /* 폰·태블릿은 창이 이미 화면 전체 — 손가락으로 확대 */
   .pp-zoomable { cursor: default; }
   .pp-body { padding: 8px; }
-  .pp-head { flex-wrap: nowrap; padding: 6px 8px 6px 12px; }
-  .pp-title { flex: 1; min-width: 0; }   /* 제목이 줄어 단추와 한 줄에 */
+  .pp-head { padding: 6px 8px 6px 12px; }
 }
 @media print { .pdfpane, .pdfzoom { display: none !important; } }
 
