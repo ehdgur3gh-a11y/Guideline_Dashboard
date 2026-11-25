@@ -1,0 +1,30 @@
+// node tests/search.test.js — 검색 엔진 동작 확인
+globalThis.window = globalThis;
+require('../web/data/data.js');
+require('../web/js/eq.js');   // 브라우저와 같게: 수식은 글로 풀어 검색
+require('../web/js/search.js');
+const assert = require('assert');
+const idx = new KRCSearch.Index(window.KRC_DATA);
+const t0 = Date.now();
+const r = idx.search('여유고');
+console.log('여유고: 절', r.hits.length, '문단', r.total, '편별', r.counts, `${Date.now() - t0}ms`);
+console.log('  제목 일치:', r.titleHits.map((s) => `${s.vol}편 ${s.num} ${s.title}`));
+assert(r.titleHits.some((s) => s.vol === 4 && s.num === '4.5.3'), '제4편 4.5.3 여유고(원문 "여 유 고")가 제목 일치로 나와야 함');
+const r2 = idx.search('물넘이');
+const r2b = idx.search('여수토');
+console.log('물넘이: 동의어', r2.synonyms, '절', r2.hits.length, '| 여수토: 절', r2b.hits.length);
+assert(r2.synonyms.includes('여수토'));
+assert.strictEqual(r2.hits.length, r2b.hits.length, '동의어끼리는 같은 결과');
+const n = idx.byNumber('4.2.1');
+console.log('4.2.1 바로가기:', n.map((s) => `${s.vol}편 ${s.title}`));
+assert(n.some((s) => s.vol === 1 && s.title === '제당 규모 결정'));
+const q = idx.search('물넘이 게이트가 없는 필댐의 여유고는 어떻게 정해?');
+console.log('질문 →', q.terms, '절', q.hits.length, '상위', q.hits.slice(0, 3).map((h) => `${h.s.vol}편 ${h.s.num}`));
+assert(q.hits.slice(0, 5).some((h) => h.s.vol === 1 && h.s.num === '4.2.1'), '질문형에서 4.2.1이 상위 5위 안');
+const sg = idx.suggest('물넘');
+console.log('자동완성 물넘:', sg.sections.map((s) => `${s.num} ${s.title}`), sg.synonym);
+const snip = idx.snippets(r.hits[0], r.alts)[0];
+console.log('미리보기:', snip.html.slice(0, 120));
+assert(snip.html.includes('<mark>'));
+assert(!KRCSearch.highlight('<b>여유고</b>', ['여유고']).includes('<b>'), 'HTML 이스케이프');
+console.log('OK');

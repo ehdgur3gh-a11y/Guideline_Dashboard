@@ -1,0 +1,19 @@
+# 조사설계실무요령 대시보드 — Linux systemd 서비스 예시
+# 설치: sudo cp deploy/krc-guideline.service /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now krc-guideline
+# 경로(/opt/krc-guideline)와 사용자(krc)는 실제 환경에 맞게 바꾼다.
+[Unit]
+Description=KRC 조사설계실무요령 대시보드
+After=network.target
+
+[Service]
+Type=simple
+User=krc
+WorkingDirectory=/opt/krc-guideline
+ExecStart=/usr/bin/node server/server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

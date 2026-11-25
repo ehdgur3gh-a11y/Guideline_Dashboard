@@ -1,0 +1,18 @@
+# 원문 HWP·강의자료 원본 (5.4GB, 저장소에 올리지 않음 — 개발 PC에만 둔다)
+#참고자료/
+/[#]참고자료/
+
+# 더 이상 쓰지 않는 예전 글꼴 원본 (KoPub 돋움 → Pretendard GOV로 교체, 2026-11-25)
+tools/fonts-src/KoPubDotum-*.ttf
+
+# 서버 실행 중 생기는 것
+server/config.json
+server/logs/
+
+# 개인 설정·임시 파일
+.claude/
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+Thumbs.db
