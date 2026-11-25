@@ -83,8 +83,10 @@
   /* ---------------- 원문 쪽 창: 본문 옆(넓은 화면)·화면 전체(태블릿·폰)에 원문 쪽 그림 ---------------- */
   const canPane = (s) => !!(s && s.pdf && volOf(s).pdf_img);
   const pad3 = (n) => String(n).padStart(3, '0');
-  const pane = { s: null, lo: 0, hi: 0, cur: 0, zoom: 1 };
-  const ZOOMS = [1, 1.25, 1.5, 2];
+  const pane = { s: null, lo: 0, hi: 0, cur: 0 };
+  // '크게 보기': 쪽 하나를 화면 가득. 폭 880px(맞춤) → 원본 1,100px → 1,650px
+  const DETAIL_W = [880, 1100, 1650];
+  const detail = { p: 0, z: 0, back: null };
   // 넓은 화면에서는 열어 둔 상태를 기억해 다른 절로 가도 계속 보여 준다(폰은 화면을 가리므로 누를 때만)
   const paneWanted = () => wide(1100) && store.get('krc.pdfpane', '0') === '1';
   /** 절이 걸친 PDF 쪽: 이 절 시작 쪽 ~ 다음 절 시작 쪽(최대 8쪽) */
@@ -112,7 +114,7 @@
     const s = pane.s, v = volOf(s), im = v.pdf_img;
     const out = [];
     for (let p = pane.lo; p <= pane.hi; p++) {
-      out.push(`<figure class="pp-page" data-page="${p}"><img src="pdf-img/${v.id}/${pad3(p)}.webp" width="${im.w}" height="${im.h}" loading="lazy" decoding="async" alt="원문 ${esc(pageLabel(s, p))}"><figcaption>${esc(pageLabel(s, p))}${p === s.pdf ? ' — 이 절이 시작하는 쪽' : ''}</figcaption></figure>`);
+      out.push(`<figure class="pp-page" data-page="${p}"><button type="button" class="pp-zoomable" data-act="pp-detail" data-page="${p}" aria-label="${esc(pageLabel(s, p))} 크게 보기"><img src="pdf-img/${v.id}/${pad3(p)}.webp" width="${im.w}" height="${im.h}" loading="lazy" decoding="async" alt="원문 ${esc(pageLabel(s, p))}"></button><figcaption>${esc(pageLabel(s, p))}${p === s.pdf ? ' — 이 절이 시작하는 쪽' : ''}</figcaption></figure>`);
     }
     return out.join('');
   }
@@ -122,7 +124,6 @@
     if (!el) return;
     const s = pane.s;
     el.querySelector('[data-pp="label"]').textContent = `제${s.vol}편 · ${pageLabel(s, p)}`;
-    el.querySelector('.pp-pdf').href = `pdf/${s.vol}.pdf#page=${p}`;
     el.querySelector('[data-act="pp-prev"]').disabled = p <= 1;
     el.querySelector('[data-act="pp-next"]').disabled = p >= volOf(s).pdf_pages;
     el.querySelectorAll('.pp-page').forEach((f) => f.classList.toggle('cur', +f.dataset.page === p));
@@ -162,13 +163,11 @@
         <span class="pp-tools">
           <button type="button" class="icon-btn" data-act="pp-prev" aria-label="이전 쪽">‹</button>
           <button type="button" class="icon-btn" data-act="pp-next" aria-label="다음 쪽">›</button>
-          <button type="button" class="icon-btn pp-zoom" data-act="pp-zoom-out" aria-label="작게">−</button>
-          <button type="button" class="icon-btn pp-zoom" data-act="pp-zoom-in" aria-label="크게">+</button>
-          <a class="btn pp-pdf" target="_blank" rel="noopener" title="원문 PDF를 새 창에서 엽니다">PDF로 열기</a>
+          <button type="button" class="btn pp-detail" data-act="pp-detail" title="지금 보는 쪽을 크게 봅니다">크게 보기</button>
           <button type="button" class="icon-btn" data-act="pp-close" aria-label="원문 쪽 닫기">✕</button>
         </span>
       </div>
-      <div class="pp-body" style="--pp-zoom:${pane.zoom}">${paneFigures()}</div>`;
+      <div class="pp-body">${paneFigures()}</div>`;
     main.appendChild(el);
     main.classList.add('with-pdf');
     document.documentElement.classList.toggle('pdf-modal', modal);
@@ -184,7 +183,65 @@
     setToggle(true);
     if (modal) el.querySelector('[data-act="pp-close"]').focus();
   }
+  /* 크게 보기: 쪽 하나를 화면 가득 — 이전·다음(←·→), 크기 3단계, PDF로 열기, 닫기(Esc) */
+  const detailEl = () => app.querySelector('.pdfzoom');
+  function detailShow() {
+    const el = detailEl(), s = pane.s, v = volOf(s), p = detail.p;
+    el.querySelector('[data-pz="label"]').textContent = `제${s.vol}편 · ${pageLabel(s, p)}`;
+    const img = el.querySelector('img');
+    img.src = `pdf-img/${v.id}/${pad3(p)}.webp`;
+    img.alt = `원문 ${pageLabel(s, p)}`;
+    img.style.width = detail.z ? `${DETAIL_W[detail.z]}px` : '';
+    img.classList.toggle('fit', !detail.z);
+    el.querySelector('.pz-pdf').href = `pdf/${s.vol}.pdf#page=${p}`;
+    el.querySelector('[data-act="pz-prev"]').disabled = p <= 1;
+    el.querySelector('[data-act="pz-next"]').disabled = p >= v.pdf_pages;
+    el.querySelector('[data-act="pz-out"]').disabled = detail.z === 0;
+    el.querySelector('[data-act="pz-in"]').disabled = detail.z === DETAIL_W.length - 1;
+    el.querySelector('.pz-body').scrollTop = 0;
+  }
+  function openDetail(p, from) {
+    if (!pane.s) return;
+    closeDetail(true);
+    Object.assign(detail, { p, z: 0, back: from || document.activeElement });
+    const el = document.createElement('div');
+    el.className = 'pdfzoom';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', '원문 쪽 크게 보기');
+    el.innerHTML = `<div class="pz-head">
+        <div class="pp-title"><strong>원문 쪽 크게 보기</strong><span class="muted" data-pz="label"></span></div>
+        <span class="pp-tools">
+          <button type="button" class="icon-btn" data-act="pz-prev" aria-label="이전 쪽">‹</button>
+          <button type="button" class="icon-btn" data-act="pz-next" aria-label="다음 쪽">›</button>
+          <button type="button" class="icon-btn" data-act="pz-out" aria-label="작게">−</button>
+          <button type="button" class="icon-btn" data-act="pz-in" aria-label="크게">+</button>
+          <a class="btn pz-pdf" target="_blank" rel="noopener" title="원문 PDF를 새 창에서 엽니다">PDF로 열기</a>
+          <button type="button" class="icon-btn" data-act="pz-close" aria-label="크게 보기 닫기">✕</button>
+        </span>
+      </div>
+      <div class="pz-body"><img decoding="async" alt=""></div>`;
+    app.appendChild(el);
+    document.documentElement.classList.add('pdf-detail');
+    detailShow();
+    el.querySelector('[data-act="pz-close"]').focus();
+  }
+  function closeDetail(quiet) {
+    const el = detailEl();
+    if (!el) return;
+    el.remove();
+    document.documentElement.classList.remove('pdf-detail');
+    if (!quiet && detail.back && document.contains(detail.back)) detail.back.focus();
+  }
+  function detailGo(d) {
+    const v = volOf(pane.s);
+    detail.p = Math.max(1, Math.min(v.pdf_pages, detail.p + d));
+    detailShow();
+    paneScrollTo(paneEnsure(detail.p));   // 옆 창도 같은 쪽으로
+  }
+
   function closePane(quiet) {
+    closeDetail(true);
     const el = paneEl();
     if (el) el.remove();
     const main = app.querySelector('main.page');
@@ -803,7 +860,7 @@
       if (st && st.krc != null) { back = scrollMemo.has(st.krc); restoreTo = scrollMemo.get(st.krc) || 0; curEntry = st.krc; }
       else { curEntry = ++entrySeq; try { history.replaceState({ krc: curEntry }, ''); } catch (e) { /* 무시 */ } }
     }
-    document.documentElement.classList.remove('pdf-modal');   // 앞 화면의 원문 창(폰 전체 화면)은 닫힌다
+    document.documentElement.classList.remove('pdf-modal', 'pdf-detail');   // 앞 화면의 원문 창(폰 전체 화면)·크게 보기는 닫힌다
     app.innerHTML = html;
     window.scrollTo(0, 0);
     app.querySelectorAll('form[data-form="search"]').forEach(attachAutocomplete);
@@ -938,13 +995,15 @@
         if (wide(1100)) store.set('krc.pdfpane', '0');
       } else if (act === 'pp-prev' || act === 'pp-next') {
         paneScrollTo(paneEnsure(pane.cur + (act === 'pp-next' ? 1 : -1)));
-      } else if (act === 'pp-zoom-in' || act === 'pp-zoom-out') {
-        const i = ZOOMS.indexOf(pane.zoom) + (act === 'pp-zoom-in' ? 1 : -1);
-        pane.zoom = ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i))];
-        const cur = pane.cur;
-        paneEl().querySelector('.pp-body').style.setProperty('--pp-zoom', pane.zoom);
-        paneScrollTo(cur);
+      } else if (act === 'pp-detail') {
+        if (wide(1100)) openDetail(+el.dataset.page || pane.cur, el);   // 폰은 창이 이미 화면 전체 — 손가락으로 확대
       }
+      return;
+    }
+    if (act.startsWith('pz-')) {
+      if (act === 'pz-close') closeDetail();
+      else if (act === 'pz-prev' || act === 'pz-next') detailGo(act === 'pz-next' ? 1 : -1);
+      else if (act === 'pz-in' || act === 'pz-out') { detail.z = Math.max(0, Math.min(DETAIL_W.length - 1, detail.z + (act === 'pz-in' ? 1 : -1))); detailShow(); }
       return;
     }
     if (act === 'scale') {
@@ -1013,6 +1072,11 @@
     if (m) { m.setAttribute('tabindex', '-1'); m.focus(); }
   });
   document.addEventListener('keydown', (e) => {
+    if (detailEl()) {
+      if (e.key === 'Escape') { e.preventDefault(); closeDetail(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); detailGo(e.key === 'ArrowRight' ? 1 : -1); }
+      return;
+    }
     if (e.key === 'Escape' && paneEl()) { closePane(); if (wide(1100)) store.set('krc.pdfpane', '0'); }
   });
   window.addEventListener('hashchange', render);

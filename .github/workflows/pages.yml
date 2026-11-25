@@ -1,0 +1,33 @@
+# GitHub Pages: main에 올릴 때마다 web/ 폴더를 그대로 웹사이트로 낸다.
+# 사이트는 서버 없이 도는 정적 웹이라(질문 답변 기능은 꺼 둠) 이 PC의 http://localhost:8080 과 같게 보인다.
+# 저장소 Settings → Pages → Source가 "GitHub Actions"여야 한다(2026-11-25 설정함). 주소: https://ehdgur3gh-a11y.github.io/Guideline_Dashboard/
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
