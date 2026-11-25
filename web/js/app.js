@@ -171,6 +171,7 @@
           <button type="button" class="icon-btn" data-act="pp-close" aria-label="원문 쪽 닫기">✕</button>
         </span>
       </div>
+      <p class="pp-hint">쪽을 누르면 크게 볼 수 있습니다</p>
       <div class="pp-body">${paneFigures()}</div>`;
     main.appendChild(el);
     main.classList.add('with-pdf');
@@ -291,6 +292,7 @@
     img.src = `pdf-img/${v.id}/${pad3(p)}.webp`;
     img.alt = `원문 ${pageLabel(s, p)}`;
     img.style.width = detail.z ? `${DETAIL_W[detail.z]}px` : '';
+    if (v.pdf_img) img.style.aspectRatio = `${v.pdf_img.w} / ${v.pdf_img.h}`;   // 그림을 받기 전에도 높이를 알아야 누른 곳으로 스크롤할 수 있다
     img.classList.toggle('fit', !detail.z);
     el.querySelector('.pz-pdf').href = `pdf/${s.vol}.pdf#page=${p}`;
     el.querySelector('[data-act="pz-prev"]').disabled = p <= 1;
@@ -299,10 +301,11 @@
     el.querySelector('[data-act="pz-in"]').disabled = detail.z === DETAIL_W.length - 1;
     el.querySelector('.pz-body').scrollTop = 0;
   }
-  function openDetail(p, from) {
+  // at: 누른 자리(쪽 안에서의 비율 [x, y]) — 폰에서 쪽을 누르면 그 자리를 가운데 두고 크게 연다
+  function openDetail(p, from, z = 0, at = null) {
     if (!pane.s) return;
     closeDetail(true);
-    Object.assign(detail, { p, z: 0, back: from || document.activeElement });
+    Object.assign(detail, { p, z, back: from || document.activeElement });
     const el = document.createElement('div');
     el.className = 'pdfzoom';
     el.setAttribute('role', 'dialog');
@@ -324,7 +327,13 @@
     document.documentElement.classList.add('pdf-detail');
     pushLayer('detail');
     detailShow();
-    el.querySelector('[data-act="pz-close"]').focus();
+    if (at) {
+      const body = el.querySelector('.pz-body'), img = el.querySelector('img');
+      const ir = img.getBoundingClientRect(), br = body.getBoundingClientRect();
+      body.scrollLeft = ir.left - br.left + at[0] * ir.width - body.clientWidth / 2;
+      body.scrollTop = ir.top - br.top + at[1] * ir.height - body.clientHeight / 2;
+    }
+    el.querySelector('[data-act="pz-close"]').focus({ preventScroll: true });
   }
   function closeDetail(quiet) {
     const el = detailEl();
@@ -369,6 +378,22 @@
     }
     return s.pdf;
   }
+  // 맨 위로: 긴 절을 폰에서 한참 내려 읽은 뒤 목차·도구로 돌아가기 쉽게 (화면 두 장 넘게 내려가면 나타난다)
+  const topBtn = document.createElement('button');
+  topBtn.type = 'button'; topBtn.className = 'totop'; topBtn.hidden = true;
+  topBtn.setAttribute('aria-label', '맨 위로'); topBtn.title = '맨 위로';
+  topBtn.innerHTML = I.up;
+  topBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const h = app.querySelector('h1:not(.sr)'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+  });
+  document.body.appendChild(topBtn);
+  let topTick = 0;
+  window.addEventListener('scroll', () => {
+    if (topTick) return;
+    topTick = requestAnimationFrame(() => { topTick = 0; topBtn.hidden = window.scrollY < window.innerHeight * 2; });
+  }, { passive: true });
+
   // 본문을 내려 읽으면 원문 창도 그 쪽으로 따라간다. 원문 창을 직접 넘기거나 굴리면 잠시(4초) 따라가지 않는다.
   let followTimer = 0;
   window.addEventListener('scroll', () => {
@@ -433,10 +458,11 @@
     </form>`;
   }
   const scaleBtn = `<button type="button" class="btn" data-act="scale">${I.text}글자 크기</button>`;
+  const scaleBtnM = `<button type="button" class="icon-btn scale-m" data-act="scale" aria-label="글자 크기" title="글자 크기">${I.text}</button>`;   // 폰 전용
   function topbar(q, scope, active, tabs) {
     const nav = (href, label, key) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`;
     return `<header class="topbar"><div class="in">
-      <a class="brand" href="#/">조사설계실무요령</a>
+      <a class="brand" href="#/">조사설계실무요령</a>${scaleBtnM}
       ${searchForm(q, scope, false)}
       <nav class="nav" aria-label="주 메뉴">${nav('#/flow', '업무 흐름', 'flow')}${nav('#/s/1-ch1', '전체 목차', 'toc')}${nav('#/tables', '표 모음', 'tables')}${scaleBtn}</nav>
     </div>${tabs || ''}</header>`;
@@ -476,12 +502,27 @@
     return { list: out, alts: r ? r.alts : [] };
   }
 
+  /* 최근 본 절 (이 기기에만 저장, 최대 6개) — 현장에서 같은 절을 다시 찾는 수고를 줄인다 */
+  const recentGet = () => store.get('krc.recent', '').split(',').filter((id) => id && idx.byId.has(id));
+  function recentAdd(id) {
+    const list = [id, ...recentGet().filter((x) => x !== id)].slice(0, 6);
+    store.set('krc.recent', list.join(','));
+  }
+  function recentHtml() {
+    const list = recentGet();
+    if (!list.length) return '';
+    return `<section class="recent" aria-label="최근 본 절">
+        <div class="head"><h2>최근 본 절</h2><button type="button" class="linklike" data-act="recent-clear">지우기</button></div>
+        <ul>${list.map((id) => { const s = idx.byId.get(id); return `<li><a href="#/s/${id}">${numTag(s.num)}<span class="t">${esc(s.title)}</span><span class="muted">제${s.vol}편</span></a></li>`; }).join('')}</ul>
+      </section>`;
+  }
+
   /* ---------------- 홈 ---------------- */
   function viewHome() {
     document.title = '조사설계실무요령';
     return `<header class="home-top"><div class="in">
         <a class="brand" href="#/">${ORG} <small>조사설계실무요령</small></a>
-        <nav class="nav" aria-label="주 메뉴"><a href="#/flow">업무 흐름</a><a href="#/s/1-ch1">전체 목차</a><a href="#/tables">표 모음</a>${scaleBtn}</nav>
+        <nav class="nav" aria-label="주 메뉴"><a href="#/flow">업무 흐름</a><a href="#/s/1-ch1">전체 목차</a><a href="#/tables">표 모음</a>${scaleBtn}</nav>${scaleBtnM}
       </div></header>
       <main id="main" class="home-main">
         <section class="hero" aria-label="검색">
@@ -489,6 +530,7 @@
           <div class="row">${searchForm('', 'all', true)}${FEATURES.ask ? `<a class="ask" href="#/ask" data-act="ask">${I.ask}질문하기</a>` : ''}</div>
           <p class="ex">예: <a href="#/search?q=${q2('여유고')}">여유고</a> · <a href="#/search?q=${q2('물넘이')}">물넘이</a> · <a href="#/s/1-4.2.1">4.2.1</a> · <a href="#/search?q=${q2('물넘이 게이트가 없는 필댐의 여유고')}">물넘이 게이트가 없는 필댐의 여유고</a></p>
         </section>
+        ${recentHtml()}
         <section class="facilities" aria-label="시설·분야로 찾기">
           <div class="head"><h2>시설·분야로 찾기</h2><a href="#/flow">업무 흐름으로 보기 →</a></div>
           <div class="tiles">${FACILITIES.map(([n, id, d]) => `<a class="tile" href="#/s/${id}"><span class="ic">${fac(d)}</span>${n}</a>`).join('')}</div>
@@ -522,8 +564,8 @@
     if (r.synonyms.length) notes.push(`<span class="tag calc">동의어 포함: ${esc(r.synonyms.join(', '))}</span>`);
     if (r.terms.length > 1 || r.terms.join('') !== q.trim()) notes.push(`<span class="tag info">찾은 키워드: ${esc(r.terms.join(', '))}</span>`);
 
-    const numCards = numHits.slice(0, 4).map((s) => `<a class="titlehit" href="#/s/${s.id}"><span class="k">절 번호로 바로 가기</span><span class="t">${numTag(s.num)}${esc(s.title)}</span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
-    const titleCards = r.titleHits.map((s) => `<a class="titlehit" href="#/s/${s.id}?q=${q2(q)}"><span class="k">절 제목 일치${s.title_raw && s.title_raw !== s.title ? ` — 원문 표기 ‘${esc(s.title_raw)}’` : ''}</span><span class="t">${numTag(s.num)}${S.highlight(s.title, r.alts)}</span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
+    const numCards = numHits.slice(0, 4).map((s) => `<a class="titlehit" href="#/s/${s.id}"><span class="k">절 번호로 바로 가기</span><span class="t">${numTag(s.num)}<span class="tt">${esc(s.title)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
+    const titleCards = r.titleHits.map((s) => `<a class="titlehit" href="#/s/${s.id}?q=${q2(q)}"><span class="k">절 제목 일치${s.title_raw && s.title_raw !== s.title ? ` — 원문 표기 ‘${esc(s.title_raw)}’` : ''}</span><span class="t">${numTag(s.num)}<span class="tt">${S.highlight(s.title, r.alts)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
     const items = shown.map((hit) => {
       const s = hit.s;
       const snips = idx.snippets(hit, r.alts, 2).map((x) => `<span class="snip">${x.kind === 'table' || x.kind === 'cap' ? '<span class="k">[표]</span>' : ''}${x.html}</span>`).join('');
@@ -545,7 +587,7 @@
       </div>
       <aside class="side">
         ${FEATURES.ask ? `<a class="card titlehit" style="background:var(--surface)" href="#/ask?q=${q2(q)}"><span class="k">${I.ask} 질문으로 찾기</span><span>${esc(q)}</span></a>` : ''}
-        ${tables.length ? `<section class="card"><h2>검색어가 들어간 표</h2>${tables.slice(0, 5).map((t) => `<a class="lnk" href="#/t/${t.s.id}/${t.bi}">${S.highlight(t.caption, r.alts)}<small>제${t.s.vol}편 › ${esc(t.s.num)}</small></a>`).join('')}${tables.length > 5 ? `<a class="lnk" href="#/tables?q=${q2(q)}">표 ${tables.length}개 모두 보기 →</a>` : ''}</section>` : ''}
+        ${tables.length ? `<section class="card"><h2>검색어가 들어간 표</h2>${tables.slice(0, 5).map((t) => `<a class="lnk" href="#/t/${t.s.id}/${t.bi}"><span>${S.highlight(t.caption, r.alts)}</span><small>제${t.s.vol}편 › ${esc(t.s.num)}</small></a>`).join('')}${tables.length > 5 ? `<a class="lnk" href="#/tables?q=${q2(q)}">표 ${tables.length}개 모두 보기 →</a>` : ''}</section>` : ''}
       </aside>
     </main>${bottomnav('home')}`;
   }
@@ -835,6 +877,7 @@
     const q = params.get('q') || '';
     const alts = q ? idx.search(q).alts : [];
     document.title = `${s.num} ${s.title} — 조사설계실무요령`;
+    recentAdd(s.id);
     const chapters = v.sections.filter((x) => x.level === 1);
     const run = chapterRun(s);
     const curCh = run[0];
@@ -876,14 +919,22 @@
   function viewTables(params) {
     const q = params.get('q') || '';
     document.title = '표 모음 — 조사설계실무요령';
-    const { list, alts } = tablesMatching(q);
-    const shown = list.slice(0, 300);
+    const { list: all, alts } = tablesMatching(q);
+    // 편으로 좁히기: 표 470개를 폰에서 한 줄로 내려 보지 않게 (편을 고르면 그 편의 표를 모두 보인다)
+    const vsel = +params.get('v') || 0;
+    const list = vsel ? all.filter((t) => t.s.vol === vsel) : all;
+    const shown = list.slice(0, vsel ? 1000 : 300);
+    const cnt = {};
+    all.forEach((t) => { cnt[t.s.vol] = (cnt[t.s.vol] || 0) + 1; });
+    const chipHref = (v) => `#/tables${q || v ? '?' + new URLSearchParams(Object.assign(q ? { q } : {}, v ? { v } : {})) : ''}`;
+    const chips = all.length ? `<nav class="chips" aria-label="편으로 좁히기"><a href="${chipHref(0)}"${vsel ? '' : ' aria-current="true"'}>전체 <span>${all.length}</span></a>${D.vols.filter((v) => cnt[v.id]).map((v) => `<a href="${chipHref(v.id)}"${vsel === v.id ? ' aria-current="true"' : ''}>제${v.id}편 ${esc(v.name)} <span>${cnt[v.id]}</span></a>`).join('')}</nav>` : '';
     const byVol = {};
     shown.forEach((t) => { (byVol[t.s.vol] = byVol[t.s.vol] || []).push(t); });
     const tabs = q ? resultTabs(q, 'tables', null, list.length) : '';
     return topbar(q, 'table', 'tables', tabs) + `<main id="main" class="page"><div class="main">
       <h1 style="margin:0;font-size:1.75rem">표 모음</h1>
-      <p class="muted" style="margin:0">${q ? `제목에 ‘${esc(q)}’가 들어간 표 ${list.length}개` : `제목이 있는 표 ${list.length}개`}${list.length > shown.length ? ` (앞의 ${shown.length}개 표시)` : ''}</p>
+      <p class="muted" style="margin:0">${q ? `제목에 ‘${esc(q)}’가 들어간 표 ${all.length}개` : `제목이 있는 표 ${all.length}개`}${list.length > shown.length ? ` (앞의 ${shown.length}개 표시 — 편을 고르면 모두 보입니다)` : ''}</p>
+      ${chips}
       ${Object.keys(byVol).map((vid) => `<section><h2 style="font-size:1.1875rem;margin:10px 0">제${vid}편 ${esc(D.vols.find((v) => v.id === +vid).name)}</h2><ul class="tbl-list">${byVol[vid].map((t) => `<li><a href="#/t/${t.s.id}/${t.bi}"><span>${alts.length ? S.highlight(t.caption, alts) : esc(t.caption)}</span><small>${esc(t.s.num)} ${esc(t.s.title)}${t.s.page ? ' · p.' + t.s.page : ''}</small></a></li>`).join('')}</ul></section>`).join('') || '<p class="empty card">해당하는 표가 없습니다.</p>'}
     </div></main>${bottomnav('tables')}`;
   }
@@ -899,14 +950,14 @@
     document.title = `${b.caption || '표'} — 조사설계실무요령`;
     return topbar('', 'table', 'tables') + `<main id="main" class="page"><div class="main">
       <p class="path" style="margin:0">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page + '~' : ''}</p>
-      <h1 style="margin:0;font-size:1.75rem">${esc(b.caption || '표')}</h1>
-      <div class="toolbar" style="border:0;margin:0;padding:0">
+      <h1 class="tv-title">${esc(b.caption || '표')}</h1>
+      <div class="toolbar tv-tools" style="border:0;margin:0;padding:0">
         <button type="button" class="btn outline" data-act="cite" data-id="${s.id}" data-extra="${esc(b.caption || '')}">${I.copy}출처 복사</button>
         <button type="button" class="btn" data-act="copy-table" data-id="${s.id}" data-bi="${bi}">엑셀로 복사</button>
         <button type="button" class="btn" data-act="csv" data-id="${s.id}" data-bi="${bi}">CSV 내려받기</button>
         <a class="btn" href="#/s/${s.id}">본문에서 보기</a>
         ${pdfToggle(s, (s.pdf_blocks && s.pdf_blocks[+bi]) || s.pdf)}
-        <label class="btn" style="margin-left:auto;cursor:text">${I.search}<span class="sr">표 안에서 찾기</span><input data-act="tfilter" type="search" spellcheck="false" autocomplete="off" placeholder="표 안에서 찾기" style="border:0;outline:none;width:160px;background:transparent"></label>
+        <label class="btn tv-find">${I.search}<span class="sr">표 안에서 찾기</span><input data-act="tfilter" type="search" spellcheck="false" autocomplete="off" placeholder="표 안에서 찾기"></label>
       </div>
       <div class="tv-wrap">${renderTable(b, [], ' id="tv"')}</div>
       <p class="muted" style="margin:0;font-size:.9375rem">원문 표의 병합 셀을 그대로 옮겼습니다. 엑셀 복사·CSV에서 수식은 한 줄 글(예: D15F/D85B &lt; 5)로 바뀝니다.</p>
@@ -1010,6 +1061,9 @@
     }
     rendered = true;
     setupHits();
+    markWide();
+    const chip = app.querySelector('.chips [aria-current]');   // 고른 편 칩이 옆으로 밀려 안 보이지 않게
+    if (chip) { const bar = chip.parentElement; bar.scrollLeft += chip.getBoundingClientRect().left - bar.getBoundingClientRect().left - (bar.clientWidth - chip.offsetWidth) / 2; }
     if (parts[0] === 's' || parts[0] === 't') {
       const ps = idx.byId.get(parts[1]);
       if (ps && paneWanted() && canPane(ps)) openPane(ps, parts[0] === 't' ? ((ps.pdf_blocks && ps.pdf_blocks[+parts[2]]) || ps.pdf) : ps.pdf);
@@ -1018,6 +1072,15 @@
     const askMain = typeof hash !== 'string' && app.querySelector('main[data-ask]');
     if (askMain) startAsk(askMain);
   }
+
+  /* 화면보다 넓은 표: '옆으로 밀어 보기' 안내를 단다 (폰에서 표 오른쪽이 잘린 줄 모르고 지나치지 않게) */
+  function markWide() {
+    app.querySelectorAll('.content .tblwrap').forEach((w) => {
+      w.parentElement.classList.toggle('wide-tbl', w.scrollWidth > w.clientWidth + 2);
+    });
+  }
+  let wideTimer = 0;
+  window.addEventListener('resize', () => { clearTimeout(wideTimer); wideTimer = setTimeout(markWide, 150); });
 
   /* ---------------- 본문 안 검색어 이동 ---------------- */
   let hitIdx = 0;
@@ -1050,7 +1113,7 @@
     function update() {
       const q = input.value.trim();
       if (!q) return close();
-      const { sections, synonym } = idx.suggest(q, 6);
+      const { sections, synonym } = idx.suggest(q, wide(700) ? 6 : 4);   // 폰: 자판이 화면 절반을 덮으므로 4개만
       const parts = [];
       if (sections.length) {
         parts.push('<span class="grp">절 바로가기</span>');
@@ -1062,10 +1125,19 @@
         parts.push('<span class="grp sep">질문으로 찾기</span>');
         parts.push(`<a class="opt" role="option" href="#/ask?q=${q2(q)}">${I.ask}<span>‘${esc(q)}’ 질문하기</span></a>`);
       }
-      parts.push('<div class="hint"><span>절 번호를 입력하면 바로 이동합니다 (예: 4.5.6)</span><span>↑↓ 이동 · Enter 선택 · Esc 닫기</span></div>');
+      parts.push('<div class="hint"><span>절 번호를 입력하면 바로 이동합니다 (예: 4.5.6)</span><span class="kbd">↑↓ 이동 · Enter 선택 · Esc 닫기</span></div>');
       box.innerHTML = parts.join('');
       box.hidden = false; input.setAttribute('aria-expanded', 'true'); sel = -1;
+      fit();
     }
+    // 폰 자판이 올라오면 보이는 높이(visualViewport)가 줄어든다 → 목록이 자판 밑으로 숨지 않게 그 안에서 스크롤
+    function fit() {
+      if (box.hidden) return;
+      const vh = window.visualViewport ? visualViewport.height + visualViewport.offsetTop : innerHeight;
+      const top = box.getBoundingClientRect().top;
+      box.style.maxHeight = Math.max(160, vh - top - 8) + 'px';
+    }
+    if (window.visualViewport) visualViewport.addEventListener('resize', fit);
     input.addEventListener('input', update);
     input.addEventListener('focus', () => { if (input.value.trim()) update(); });
     input.addEventListener('blur', () => setTimeout(close, 150));
@@ -1138,8 +1210,20 @@
         pane.manualUntil = Date.now() + 4000;
         paneScrollTo(paneEnsure(pane.cur + (act === 'pp-next' ? 1 : -1)));
       } else if (act === 'pp-detail') {
-        if (wide(1100)) openDetail(+el.dataset.page || pane.cur, el);   // 폰은 창이 이미 화면 전체 — 손가락으로 확대
+        if (wide(1100)) openDetail(+el.dataset.page || pane.cur, el);
+        else if (el.classList.contains('pp-zoomable')) {   // 폰·태블릿: 쪽을 누르면 원본 크기로, 누른 자리부터
+          const r = el.getBoundingClientRect();
+          const at = e.clientX || e.clientY ? [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height] : [0.5, 0.15];
+          openDetail(+el.dataset.page, el, 1, at);
+        }
       }
+      return;
+    }
+    if (act === 'recent-clear') {
+      store.set('krc.recent', '');
+      const sec = app.querySelector('.recent');
+      if (sec) sec.remove();
+      toast('최근 본 절을 지웠습니다');
       return;
     }
     if (act.startsWith('pz-')) {
