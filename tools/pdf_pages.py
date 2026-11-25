@@ -115,7 +115,35 @@ for vol, path in sorted(sources):
             pages[s['id']] = page
             last = page
     offset = deltas.most_common(1)[0][0] if deltas else 0
-    # 제목 있는 표: 절 쪽부터 다음 절 쪽까지에서 표 제목이 처음 나오는 쪽 (표 뷰어에서 그 쪽을 바로 연다)
+    # 머리말 글로 못 찾은 절(제4편 부록 설계 사례 등): 앞뒤 절 쪽 사이에서 그 절 문단이 처음 나오는 쪽,
+    # 문단이 없는 절(머리말만)은 바로 다음 하위 절의 쪽
+    secs = [s for s, _ in keys]
+    for si, s in enumerate(secs):
+        if s['id'] in pages:
+            continue
+        lo = next((pages[x['id']] for x in reversed(secs[:si]) if x['id'] in pages), 1)
+        hi = next((pages[x['id']] for x in secs[si + 1:] if x['id'] in pages), n)
+        found = None
+        for b in s['blocks']:
+            k = norm(b.get('text', '')) [:18] if b['t'] == 'p' else ''
+            if len(k) >= 10:
+                found = next((i + 1 for i in range(lo - 1, min(n, hi)) if k in texts[i]), None)
+                if found:
+                    break
+        if not found and not s['blocks'] and si + 1 < len(secs) and secs[si + 1]['num'].startswith(s['num'] + '.'):
+            nxt = secs[si + 1]
+            for b in nxt['blocks']:
+                k = norm(b.get('text', ''))[:18] if b['t'] == 'p' else ''
+                if len(k) >= 10:
+                    found = next((i + 1 for i in range(lo - 1, min(n, hi)) if k in texts[i]), None)
+                    if found:
+                        break
+        if found:
+            pages[s['id']] = found
+            free += 1
+    # 블록 → PDF 쪽: 제목 있는 표, '[그림 …]' 제목 문단, 그리고 본문 문단(앞 18글자).
+    # 절 쪽부터 다음 절 쪽까지에서 찾고, 쪽은 블록 차례대로 줄지 않게(앞 블록 쪽보다 앞서지 않게) 고른다.
+    # 표 뷰어·그림 자리 단추는 그 쪽을 열고, 원문 창은 본문을 읽는 자리의 쪽으로 따라간다.
     tables = {}
     order = [s for s, _ in keys]
     for si, s in enumerate(order):
@@ -123,19 +151,20 @@ for vol, path in sorted(sources):
         if not start:
             continue
         stop = next((pages[x['id']] for x in order[si + 1:] if pages.get(x['id'])), n)
+        floor = start
         for bi, b in enumerate(s['blocks']):
-            # 표 제목, 그리고 그림 제목 문단('[그림 4.2.1] 댐 높이') — 본문의 그림 자리를 누르면 원문 창이 그 쪽으로 간다
             if b['t'] == 'table':
                 cap = norm(b.get('caption', ''))[:16]
-            elif b['t'] == 'p' and re.match(r'^\s*\[그림', b.get('text', '')):
-                cap = norm(b['text'])[:16]
+            elif b['t'] == 'p':
+                cap = norm(b.get('text', ''))[:18]
             else:
                 cap = ''
-            if len(cap) < 6:
+            if len(cap) < 8:
                 continue
-            hit = next((i + 1 for i in range(start - 1, min(n, stop + 1)) if cap in texts[i]), None)
+            hit = next((i + 1 for i in range(floor - 1, min(n, stop + 1)) if cap in texts[i]), None)
             if hit:
                 tables[f"{s['id']}/{bi}"] = hit
+                floor = hit
 
     # 사진 줄이고 편 하나로 저장
     out = os.path.join(out_root, f'{vol}.pdf')

@@ -82,6 +82,15 @@ for v in index:
             if tp:
                 s['pdf_blocks'] = tp   # 블록 번호 → PDF 쪽 (제목 있는 표, '[그림 …]' 제목 문단)
         stats['pdf_sections'] = stats.get('pdf_sections', 0) + sum(1 for s in vol['sections'] if s.get('pdf'))
+        # 그래도 쪽을 못 찾은 절(표·수식만 있는 부록 절 몇 개): 앞 절의 쪽을 '어림'으로 — 원문 창이 사라지지 않게
+        last = None
+        for s in vol['sections']:
+            if s.get('pdf'):
+                last = s['pdf']
+            elif last and isinstance(s.get('chapter'), (int, str)):
+                s['pdf'] = last
+                s['pdf_approx'] = True
+                stats['pdf_approx'] = stats.get('pdf_approx', 0) + 1
     extra = {}
     if has_pdf:
         extra['pdf_pages'] = pm['pages']

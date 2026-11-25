@@ -341,6 +341,11 @@ def classify_heading(text):
     m = SEC_RE.match(t)
     if m:
         a, b, c, title = m.group(1), m.group(2), m.group(3), m.group(4)
+        # '5.3 2차원수치모형…'처럼 셋째 숫자가 빈칸 뒤에 오고 바로 글자가 붙으면 제목의 일부다(5.3.2가 아니라 5.3)
+        if c:
+            m2 = re.match(r'^\s*\d+\s*\.\s*\d+(\s+)' + c + r'(\S)', t)
+            if m2 and not m2.group(2).isdigit() and m2.group(2) not in '.)':
+                c, title = None, t[m2.end(1):].strip()
         # '32. 2011년도 …' 같은 참고문헌 항목을 절 번호로 오인하지 않도록 번호 크기를 제한
         if int(a) > 20 or int(b) > 40 or (c and int(c) > 40):
             return None

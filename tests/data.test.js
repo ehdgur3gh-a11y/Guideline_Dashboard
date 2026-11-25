@@ -74,3 +74,14 @@ if (fs.existsSync(path.join(__dirname, '..', 'web', 'pdf-img'))) {
   assert(figs > 900, '쪽을 찾은 표·그림 제목 ' + figs);
   console.log('원문 쪽 그림: 7편 모두, 표·그림 제목', figs, '개에 쪽');
 }
+
+// 검토(원문 창 따라가기·부록 제목): 문단마다 원문 쪽, '5.3 2차원…'을 5.3.2로 잘못 읽던 것
+if (fs.existsSync(path.join(__dirname, '..', 'web', 'pdf', '4.pdf'))) {
+  const paraPages = D.vols.flatMap((v) => v.sections).reduce((n, s) => n + Object.keys(s.pdf_blocks || {}).length, 0);
+  assert(paraPages > 10000, '문단·표·그림 → 원문 쪽 ' + paraPages);
+  assert(D.vols.flatMap((v) => v.sections).every((s) => s.pdf), '모든 절에 원문 창 쪽(못 찾은 몇 절은 어림)');
+  assert.strictEqual(sec('4-app-5.3').title, '2차원수치모형을 이용한 배수갑문부 흐름분석');
+  assert.strictEqual(sec('4-app-5.4').title, '3차원수치모형을 이용한 배수갑문부 흐름분석');
+  assert(!sec('4-app-5.3.2~2'), "'5.3.2~2' 같은 겹친 번호가 없어야");
+  console.log('원문 창: 문단·표·그림', paraPages, '개에 쪽, 2차원/3차원 제목 OK');
+}

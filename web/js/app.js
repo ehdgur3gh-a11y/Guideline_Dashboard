@@ -98,7 +98,7 @@
   }
   /** 쪽 이름: 인쇄 쪽(목차 쪽 번호와 같은 것)을 먼저, PDF 쪽을 뒤에 */
   function pageLabel(s, p) {
-    const printed = s.page ? p - (s.pdf - s.page) : 0;
+    const printed = s.page && !s.pdf_approx ? p - (s.pdf - s.page) : 0;
     return printed > 0 ? `인쇄 ${printed}쪽 · PDF ${p}쪽` : `PDF ${p}쪽`;
   }
   const printedOf = (s, p) => { const x = s.page ? p - (s.pdf - s.page) : 0; return x > 0 ? x : p; };
@@ -123,17 +123,20 @@
     const el = paneEl();
     if (!el) return;
     const s = pane.s;
-    el.querySelector('[data-pp="label"]').textContent = `제${s.vol}편 · ${pageLabel(s, p)}`;
+    el.querySelector('[data-pp="label"]').textContent = `제${s.vol}편 · ${pageLabel(s, p)}${s.pdf_approx ? ' · 쪽 어림(이 절 쪽을 못 찾아 앞 절 쪽)' : ''}`;
     el.querySelector('[data-act="pp-prev"]').disabled = p <= 1;
     el.querySelector('[data-act="pp-next"]').disabled = p >= volOf(s).pdf_pages;
     el.querySelectorAll('.pp-page').forEach((f) => f.classList.toggle('cur', +f.dataset.page === p));
   }
-  function paneScrollTo(p) {
+  function paneScrollTo(p, smooth) {
     const el = paneEl();
     if (!el) return;
     const body = el.querySelector('.pp-body');
     const fig = body.querySelector(`.pp-page[data-page="${p}"]`);
-    if (fig) body.scrollTop = fig.offsetTop - body.offsetTop - 8;
+    if (fig) {
+      const top = fig.offsetTop - body.offsetTop - 8;
+      if (smooth && body.scrollTo) { pane.autoScroll = Date.now() + 800; body.scrollTo({ top, behavior: 'smooth' }); } else body.scrollTop = top;
+    }
     paneSetCur(p);
   }
   function paneEnsure(p) {   // p쪽이 창에 없으면 앞뒤로 이어 붙인다
@@ -186,6 +189,10 @@
     }
     document.documentElement.classList.toggle('pdf-modal', modal);
     const body = el.querySelector('.pp-body');
+    const manual = () => { pane.manualUntil = Date.now() + 4000; };
+    body.addEventListener('wheel', manual, { passive: true });
+    body.addEventListener('touchstart', manual, { passive: true });
+    body.addEventListener('keydown', manual);
     body.addEventListener('scroll', () => {   // 보고 있는 쪽을 머리줄에 표시
       const top = body.scrollTop + body.offsetTop + 40;
       let cur = pane.lo;
@@ -195,7 +202,7 @@
     paneScrollTo(f);
     requestAnimationFrame(() => paneScrollTo(f));   // 그림 자리 높이가 잡힌 뒤 한 번 더
     setToggle(true);
-    if (modal) el.querySelector('[data-act="pp-close"]').focus();
+    if (modal) { pushLayer('pane'); el.querySelector('[data-act="pp-close"]').focus(); }
   }
   /* 원문 창 폭 — 기본은 '쪽 하나가 창 높이에 통째로 들어가는 가장 큰 폭', 왼쪽 가장자리를 끌면 바꾸고 기억(두 번 누르면 기본) */
   const PANE_MIN = 300;
@@ -257,6 +264,24 @@
     paneApplyWidth();
   }
 
+  /* 겹쳐 뜨는 창(폰의 원문 쪽 창, 크게 보기)은 폰·브라우저의 '뒤로'로 닫힌다.
+     열 때 같은 주소로 기록을 하나 쌓고(hashchange가 안 나므로 화면은 다시 그리지 않는다), 뒤로 가면 popstate에서 닫는다.
+     ✕로 닫으면 쌓았던 기록을 history.back()으로 거둔다. */
+  const layers = [];   // 쌓은 겹창 이름: 'pane' | 'detail'
+  function pushLayer(name) {
+    try { history.pushState(Object.assign({}, history.state, { layer: name }), ''); layers.push(name); } catch (e) { /* 무시 */ }
+  }
+  function dropLayer(name) {   // ✕·Esc로 닫을 때: 쌓은 기록을 거둔다
+    if (layers[layers.length - 1] === name) { layers.pop(); skipPop++; history.back(); }
+  }
+  let skipPop = 0;
+  window.addEventListener('popstate', () => {
+    if (skipPop) { skipPop--; return; }
+    const top = layers.pop();
+    if (top === 'detail' && detailEl()) closeDetail();
+    else if (top === 'pane' && paneEl()) { closePane(); }
+  });
+
   /* 크게 보기: 쪽 하나를 화면 가득 — 이전·다음(←·→), 크기 3단계, PDF로 열기, 닫기(Esc) */
   const detailEl = () => app.querySelector('.pdfzoom');
   function detailShow() {
@@ -297,6 +322,7 @@
       <div class="pz-body"><img decoding="async" alt=""></div>`;
     app.appendChild(el);
     document.documentElement.classList.add('pdf-detail');
+    pushLayer('detail');
     detailShow();
     el.querySelector('[data-act="pz-close"]').focus();
   }
@@ -327,6 +353,42 @@
       if (t) t.focus();
     }
   }
+  /** 본문 블록 번호 → 원문 쪽 어림: 아는 쪽(절 시작, 쪽을 찾은 표·그림 제목, 다음 절 시작) 사이를 블록 차례로 나눈다 */
+  function pageAtBlock(s, bi) {
+    const anchors = [[0, s.pdf]];
+    for (const [k, pg] of Object.entries(s.pdf_blocks || {})) anchors.push([+k, pg]);
+    const [, end] = sectionRange(s);
+    anchors.push([s.blocks.length, Math.max(end, s.pdf)]);
+    anchors.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < anchors.length - 1; i++) {
+      const [b0, p0] = anchors[i], [b1, p1] = anchors[i + 1];
+      if (bi >= b0 && bi <= b1) {
+        if (bi === b0) return p0;
+        return Math.max(p0, Math.min(p1, Math.floor(p0 + ((p1 - p0) * (bi - b0)) / Math.max(1, b1 - b0))));
+      }
+    }
+    return s.pdf;
+  }
+  // 본문을 내려 읽으면 원문 창도 그 쪽으로 따라간다. 원문 창을 직접 넘기거나 굴리면 잠시(4초) 따라가지 않는다.
+  let followTimer = 0;
+  window.addEventListener('scroll', () => {
+    if (followTimer) return;
+    followTimer = setTimeout(() => {
+      followTimer = 0;
+      const el = paneEl();
+      if (!el || !pane.s || !wide(1100) || Date.now() < (pane.manualUntil || 0)) return;
+      const line = window.innerHeight * 0.3;   // 화면 위쪽 30% 높이에 걸친 블록을 '읽는 자리'로
+      let bi = null;
+      for (const b of app.querySelectorAll('.content [data-bi]')) {
+        const r = b.getBoundingClientRect();
+        if (r.bottom >= line) { bi = +b.dataset.bi; break; }
+      }
+      if (bi == null) return;
+      const p = pageAtBlock(pane.s, bi);
+      if (p !== pane.cur) paneScrollTo(paneEnsure(p), true);
+    }, 150);
+  }, { passive: true });
+
   /** 머리 단추: 원문 쪽 창을 여닫는다. 쪽 그림이 없는 편은 예전처럼 PDF를 새 창으로 */
   function pdfToggle(s, page) {
     if (!canPane(s)) return pdfLink(s, page);
@@ -364,7 +426,7 @@
         <label class="sr" for="scope-${big ? 'h' : 't'}">검색 범위</label>
         <select id="scope-${big ? 'h' : 't'}" name="scope">${opt('all', '통합')}${opt('title', '절 번호·제목')}${opt('body', '본문')}${opt('table', '표')}</select>
         <label class="sr" for="q-${big ? 'h' : 't'}">검색어 또는 절 번호</label>
-        <input id="q-${big ? 'h' : 't'}" name="q" type="search" value="${esc(q || '')}" placeholder="${!wide(359) ? '검색어·절 번호' : !wide(700) ? '검색어 또는 절 번호' : FEATURES.ask ? '검색어, 절 번호 또는 질문을 입력하세요' : '검색어나 절 번호를 입력하세요 (문장으로 써도 됩니다)'}" role="combobox" aria-expanded="false" aria-controls="ac-${big ? 'h' : 't'}" aria-autocomplete="list">
+        <input id="q-${big ? 'h' : 't'}" name="q" type="search" value="${esc(q || '')}" placeholder="${!wide(359) ? '검색어·절 번호' : !wide(700) ? '검색어 또는 절 번호' : FEATURES.ask ? '검색어, 절 번호 또는 질문을 입력하세요' : '검색어나 절 번호를 입력하세요 (문장으로 써도 됩니다)'}" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ac-${big ? 'h' : 't'}" aria-autocomplete="list">
         <button type="submit" aria-label="검색">${I.search}<span class="bt">검색</span></button>
       </div>
       <div class="ac" id="ac-${big ? 'h' : 't'}" role="listbox" hidden></div>
@@ -738,14 +800,14 @@
         let cls = '';
         if (/^(\d+\)|\(\d+\)|[가-하]\)|\([가-하]\)|[①-⑳]|[○ㅇ•·-]\s)/.test(t)) cls = 'item';
         if (/^([가-하]|\d+)\.\s/.test(t) && t.length < 60) cls = 'sub';
-        out.push(`<p${cls ? ` class="${cls}"` : ''}>${renderRuns(b, alts)}</p>`);
+        out.push(`<p data-bi="${bi}"${cls ? ` class="${cls}"` : ''}>${renderRuns(b, alts)}</p>`);
       } else if (b.t === 'table') {
         if (b.rows * b.cols <= 1 && !b.caption) {
           const txt = (b.cells[0] && b.cells[0].text) || '';
-          if (txt) out.push(`<div class="note">${alts && alts.length ? S.highlight(txt, alts) : esc(txt)}</div>`);
+          if (txt) out.push(`<div class="note" data-bi="${bi}">${alts && alts.length ? S.highlight(txt, alts) : esc(txt)}</div>`);
           return;
         }
-        out.push(`<figure><figcaption><span>${b.caption ? (alts && alts.length ? S.highlight(b.caption, alts) : esc(b.caption)) : '표'}</span>
+        out.push(`<figure data-bi="${bi}"><figcaption><span>${b.caption ? (alts && alts.length ? S.highlight(b.caption, alts) : esc(b.caption)) : '표'}</span>
           <span style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="copy-table" data-id="${s.id}" data-bi="${bi}">${I.copy}표 복사</button><a class="btn" href="#/t/${s.id}/${bi}">크게 보기</a>${canPane(s) ? `<button type="button" class="btn" data-act="pdf-at" data-page="${(s.pdf_blocks && s.pdf_blocks[bi]) || s.pdf}" title="원문 쪽 창에서 이 표가 있는 쪽을 엽니다">${I.doc}원문</button>` : ''}</span></figcaption>
           <div class="tblwrap">${renderTable(b, alts)}</div></figure>`);
       } else if (b.t === 'fig') {
@@ -754,12 +816,14 @@
         const nAlts = (alts || []).map(S.norm);
         const hitInside = f.texts.some((t) => nAlts.some((a) => a && S.norm(t).includes(a)));
         // 원문 쪽 창이 있으면 그림 자리를 누르면 그 그림이 있는 쪽으로(그림 제목 쪽을 못 찾으면 절 첫 쪽)
-        const exact = f.caption && s.pdf_blocks && s.pdf_blocks[f.end - 1];   // 그림 제목 쪽을 찾았는가
+        // 그림 쪽: 그림 제목 문단의 쪽, 없으면 바로 뒤·앞 문단의 쪽(그림은 그 사이에 있다)
+        const pb = s.pdf_blocks || {};
+        const exact = (f.caption && pb[f.end - 1]) || pb[f.end] || pb[bi - 1] || 0;
         const figPage = canPane(s) ? (exact || s.pdf) : 0;
         const fh = figPage
           ? `<button type="button" class="fh fh-btn" data-act="pdf-at" data-page="${figPage}">${I.img}<span><strong>${f.caption ? hl(f.caption) : '그림'}</strong> <span class="go">${exact ? `원문 ${printedOf(s, figPage)}쪽에서 그림 보기 →` : '원문 쪽에서 보기 →'}</span></span></button>`
           : `<div class="fh">${I.img}<span><strong>${f.caption ? hl(f.caption) : '그림'}</strong> <span class="muted">— 그림은 원문에서 확인하세요${s.page ? ` (이 절 p.${s.page}~)` : ''}</span></span></div>`;
-        out.push(`<div class="figph">${fh}${f.texts.length ? `<details${hitInside ? ' open' : ''}><summary>그림 속 글자 ${f.texts.length}개 보기</summary><ul>${f.texts.map((t) => `<li>${hl(t)}</li>`).join('')}</ul></details>` : ''}</div>`);
+        out.push(`<div class="figph" data-bi="${bi}">${fh}${f.texts.length ? `<details${hitInside ? ' open' : ''}><summary>그림 속 글자 ${f.texts.length}개 보기</summary><ul>${f.texts.map((t) => `<li>${hl(t)}</li>`).join('')}</ul></details>` : ''}</div>`);
       }
     });
     return out.join('');
@@ -842,7 +906,7 @@
         <button type="button" class="btn" data-act="csv" data-id="${s.id}" data-bi="${bi}">CSV 내려받기</button>
         <a class="btn" href="#/s/${s.id}">본문에서 보기</a>
         ${pdfToggle(s, (s.pdf_blocks && s.pdf_blocks[+bi]) || s.pdf)}
-        <label class="btn" style="margin-left:auto;cursor:text">${I.search}<span class="sr">표 안에서 찾기</span><input data-act="tfilter" type="search" placeholder="표 안에서 찾기" style="border:0;outline:none;width:160px;background:transparent"></label>
+        <label class="btn" style="margin-left:auto;cursor:text">${I.search}<span class="sr">표 안에서 찾기</span><input data-act="tfilter" type="search" spellcheck="false" autocomplete="off" placeholder="표 안에서 찾기" style="border:0;outline:none;width:160px;background:transparent"></label>
       </div>
       <div class="tv-wrap">${renderTable(b, [], ' id="tv"')}</div>
       <p class="muted" style="margin:0;font-size:.9375rem">원문 표의 병합 셀을 그대로 옮겼습니다. 엑셀 복사·CSV에서 수식은 한 줄 글(예: D15F/D85B &lt; 5)로 바뀝니다.</p>
@@ -934,7 +998,8 @@
       if (st && st.krc != null) { back = scrollMemo.has(st.krc); restoreTo = scrollMemo.get(st.krc) || 0; curEntry = st.krc; }
       else { curEntry = ++entrySeq; try { history.replaceState({ krc: curEntry }, ''); } catch (e) { /* 무시 */ } }
     }
-    document.documentElement.classList.remove('pdf-modal', 'pdf-detail');   // 앞 화면의 원문 창(폰 전체 화면)·크게 보기는 닫힌다
+    document.documentElement.classList.remove('pdf-modal', 'pdf-detail');
+    if (typeof hash !== 'string' && !(history.state && history.state.layer)) layers.length = 0;   // 앞 화면의 원문 창(폰 전체 화면)·크게 보기는 닫힌다
     app.innerHTML = html;
     window.scrollTo(0, 0);
     app.querySelectorAll('form[data-form="search"]').forEach(attachAutocomplete);
@@ -1058,16 +1123,19 @@
       const id = parseHash().parts[1];
       const ps = idx.byId.get(id);
       if (act === 'pdf-toggle') {
-        if (paneEl()) { closePane(); if (wide(1100)) store.set('krc.pdfpane', '0'); }
+        if (paneEl()) { closePane(); dropLayer('pane'); if (wide(1100)) store.set('krc.pdfpane', '0'); }
         else { openPane(ps, +el.dataset.page || ps.pdf); if (wide(1100)) store.set('krc.pdfpane', '1'); }
       } else if (act === 'pdf-at') {
         const pg = +el.dataset.page;
+        pane.manualUntil = Date.now() + 4000;   // 그림·표로 간 쪽에 머물게
         if (!paneEl()) { openPane(ps, pg); if (wide(1100)) store.set('krc.pdfpane', '1'); }
         else paneScrollTo(paneEnsure(pg));
       } else if (act === 'pp-close') {
         closePane();
+        dropLayer('pane');
         if (wide(1100)) store.set('krc.pdfpane', '0');
       } else if (act === 'pp-prev' || act === 'pp-next') {
+        pane.manualUntil = Date.now() + 4000;
         paneScrollTo(paneEnsure(pane.cur + (act === 'pp-next' ? 1 : -1)));
       } else if (act === 'pp-detail') {
         if (wide(1100)) openDetail(+el.dataset.page || pane.cur, el);   // 폰은 창이 이미 화면 전체 — 손가락으로 확대
@@ -1075,7 +1143,7 @@
       return;
     }
     if (act.startsWith('pz-')) {
-      if (act === 'pz-close') closeDetail();
+      if (act === 'pz-close') { closeDetail(); dropLayer('detail'); }
       else if (act === 'pz-prev' || act === 'pz-next') detailGo(act === 'pz-next' ? 1 : -1);
       else if (act === 'pz-in' || act === 'pz-out') { detail.z = Math.max(0, Math.min(DETAIL_W.length - 1, detail.z + (act === 'pz-in' ? 1 : -1))); detailShow(); }
       return;
@@ -1146,12 +1214,23 @@
     if (m) { m.setAttribute('tabindex', '-1'); m.focus(); }
   });
   document.addEventListener('keydown', (e) => {
+    // 겹쳐 뜬 창(크게 보기, 폰의 원문 창) 안에서만 Tab이 돈다 — 뒤의 가려진 화면으로 초점이 빠지지 않게
+    const dlg = detailEl() || (document.documentElement.classList.contains('pdf-modal') ? paneEl() : null);
+    if (dlg && e.key === 'Tab') {
+      const items = [...dlg.querySelectorAll('button:not([disabled]), a[href], [tabindex="0"]')].filter((x) => x.offsetParent !== null);
+      if (items.length) {
+        const first = items[0], last = items[items.length - 1];
+        if (!dlg.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+        else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
     if (detailEl()) {
-      if (e.key === 'Escape') { e.preventDefault(); closeDetail(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeDetail(); dropLayer('detail'); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); detailGo(e.key === 'ArrowRight' ? 1 : -1); }
       return;
     }
-    if (e.key === 'Escape' && paneEl()) { closePane(); if (wide(1100)) store.set('krc.pdfpane', '0'); }
+    if (e.key === 'Escape' && paneEl()) { closePane(); dropLayer('pane'); if (wide(1100)) store.set('krc.pdfpane', '0'); }
   });
   window.addEventListener('hashchange', render);
   render();
