@@ -14,7 +14,7 @@
 아래 두 폴더(+ `deploy/`)만 복사하면 된다. `#참고자료`, `data/`, `tools/`, `tests/`는 운영에 필요 없다(원문을 다시 추출할 때만 쓰는 개발용).
 
 ```
-web/       화면 (HTML·JS·CSS·글꼴·사진·원문 데이터 data/data.js) — 글꼴 라이선스 web/fonts/OFL.txt를 함께 둘 것(OFL 조건)
+web/       화면 (HTML·JS·CSS·글꼴·사진·원문 데이터 data/data.js·원문 PDF pdf/ 약 62MB) — 글꼴 라이선스 web/fonts/OFL.txt를 함께 둘 것(OFL 조건)
 server/    서버 (server.js, lib/, config.example.json)
 deploy/    시작 스크립트
 ```
@@ -43,6 +43,11 @@ deploy/    시작 스크립트
 
 ### 복사 단추
 - 사내망 `http://` 주소에서는 브라우저가 클립보드 기능을 막는다(https·localhost만 허용). 화면은 예전 방식으로 대신 복사하고, 그것도 안 되면 '복사하지 못했습니다'라고 알린다. 앞단에 HTTPS를 붙이면 이 문제가 없다.
+
+### 원문 쪽 보기 (PDF)
+- `web/pdf/<편>.pdf`(편마다 1~24MB)를 브라우저 내장 PDF 보기로 연다. 편마다 처음 한 번 받고 하루 동안 다시 받지 않는다(서버가 `max-age=86400`, 나눠 받기(Range) 지원).
+- 크롬·엣지·파이어폭스는 새 창에 바로 보인다. 안드로이드 폰 크롬은 PDF를 내려받아 PDF 앱으로 연다.
+- 원문이 개정되면 `tools/hwp_to_pdf.ps1`(한글 설치 PC) → `web/pdf` 폴더를 지우고 `bash tools/build_all.sh`.
 
 ### 속도
 - 원문 데이터(`web/data/data.js`)는 4.3MB지만 서버가 gzip으로 약 0.95MB로 줄여 보내고, 두 번째 접속부터는 바뀌지 않았으면 내려받지 않는다(ETag → 304). 사내망 첫 접속 1초 안팎.

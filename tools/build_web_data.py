@@ -51,6 +51,9 @@ def fix_blocks(blocks):
 
 data_dir, web_dir = sys.argv[1], sys.argv[2]
 index = json.load(open(os.path.join(data_dir, 'index.json'), encoding='utf-8'))
+# 원문 쪽 보기: tools/pdf_pages.py가 만든 절·표 → PDF 쪽 (web/pdf/<편>.pdf가 있는 편만)
+pdf_map_path = os.path.join(data_dir, 'pdf_pages.json')
+pdf_map = json.load(open(pdf_map_path, encoding='utf-8')) if os.path.exists(pdf_map_path) else {}
 vols = []
 for v in index:
     vol = json.load(open(os.path.join(data_dir, f"vol{v['id']}.json"), encoding='utf-8'))
@@ -66,7 +69,17 @@ for v in index:
         after = next((x['page'] for x in secs[i + 1:] if x.get('page')), None)
         if before and after:
             s['page_between'] = [before, after]
-    vols.append({'id': vol['id'], 'name': vol['name'], 'year': vol['year'], 'sections': vol['sections']})
+    pm = pdf_map.get(str(vol['id']))
+    has_pdf = pm and os.path.exists(os.path.join(web_dir, 'pdf', f"{vol['id']}.pdf"))
+    if has_pdf:
+        for s in vol['sections']:
+            if pm['sections'].get(s['id']):
+                s['pdf'] = pm['sections'][s['id']]
+            tp = {int(k.split('/')[1]): pg for k, pg in pm.get('tables', {}).items() if k.split('/')[0] == s['id']}
+            if tp:
+                s['pdf_tables'] = tp
+        stats['pdf_sections'] = stats.get('pdf_sections', 0) + sum(1 for s in vol['sections'] if s.get('pdf'))
+    vols.append({'id': vol['id'], 'name': vol['name'], 'year': vol['year'], 'sections': vol['sections'], **({'pdf_pages': pm['pages']} if has_pdf else {})})
 
 out_dir = os.path.join(web_dir, 'data')
 os.makedirs(out_dir, exist_ok=True)

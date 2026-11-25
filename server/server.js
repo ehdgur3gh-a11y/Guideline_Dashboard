@@ -21,7 +21,7 @@ const excerpt = require('./lib/models/excerpt').create();
 const model = cfg.model === 'local' ? require('./lib/models/openai-compatible').create(cfg.llm) : excerpt;
 
 const WEB = path.join(ROOT, 'web');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.pdf': 'application/pdf' };
 
 /* ---------- 동시 실행 제한 (GPU 보호) ---------- */
 let active = 0;
@@ -166,14 +166,26 @@ function serveStatic(req, res) {
     const headers = {
       'content-type': MIME[path.extname(file)] || 'application/octet-stream',
       // 글꼴·사진은 하루, 나머지는 매번 확인하되 바뀌지 않았으면 304로 본문 없이
-      'cache-control': /\.(woff2|jpg|png)$/.test(file) ? 'max-age=86400' : 'no-cache',
+      'cache-control': /\.(woff2|jpg|png|pdf)$/.test(file) ? 'max-age=86400' : 'no-cache',   // 원문 PDF도 하루 보관 (편마다 수 MB)
       etag,
       vary: 'accept-encoding',
     };
+    // 원문 PDF는 브라우저 내장 PDF 보기가 그리므로 CSP(object-src 'none' 등)를 붙이지 않는다 — 우리 스크립트가 없는 정적 파일
+    if (file.endsWith('.pdf')) res.removeHeader('content-security-policy');
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
     const gzip = COMPRESSIBLE.test(file) && st.size > 1024 && /\bgzip\b/.test(req.headers['accept-encoding'] || '');
     if (!gzip) {
-      res.writeHead(200, { ...headers, 'content-length': st.size });
+      // 바이트 범위 요청(Range): 브라우저 PDF 보기가 큰 파일을 나눠 받거나 끊긴 받기를 이어 받을 때 쓴다
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (m && (m[1] || m[2])) {
+        let start = m[1] ? +m[1] : Math.max(0, st.size - +m[2]);
+        let end = m[1] && m[2] ? Math.min(+m[2], st.size - 1) : st.size - 1;
+        if (start > end || start >= st.size) { res.writeHead(416, { ...headers, 'content-range': `bytes */${st.size}` }); return res.end(); }
+        res.writeHead(206, { ...headers, 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${st.size}`, 'content-length': end - start + 1 });
+        if (req.method === 'HEAD') return res.end();
+        return fs.createReadStream(file, { start, end }).pipe(res);
+      }
+      res.writeHead(200, { ...headers, 'accept-ranges': 'bytes', 'content-length': st.size });
       if (req.method === 'HEAD') return res.end();
       return fs.createReadStream(file).pipe(res);
     }

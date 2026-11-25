@@ -45,3 +45,18 @@ assert(sec('3-4.9.4') && sec('3-4.9.4').title === '배수로', '3-4.9.4');
 assert(para('7-2.8', 'KS A 0110'), '각주');
 console.log('첨자 run', runs, '개 · 절', D.vols.reduce((n, v) => n + v.sections.length, 0), '개');
 console.log('OK');
+
+// 원문 쪽 보기 (web/pdf/<편>.pdf가 있을 때만): 알려진 쪽, GitHub 한 파일 100MB 제한
+const fs = require('fs');
+const path = require('path');
+const pdfDir = path.join(__dirname, '..', 'web', 'pdf');
+if (fs.existsSync(path.join(pdfDir, '1.pdf'))) {
+  assert.strictEqual(sec('1-4.2.1').pdf, 115, '제1편 4.2.1 제당 규모 결정 = 인쇄 105쪽 = PDF 115쪽');
+  assert.strictEqual(sec('1-4.2.1').pdf_tables[25], 117, '[표 4.2.1]은 PDF 117쪽');
+  assert.strictEqual(sec('5-1.2.1').pdf, 11, '제5편(모아찍기를 한 쪽씩으로 가른 편) 1.2.1');
+  for (const f of fs.readdirSync(pdfDir)) assert(fs.statSync(path.join(pdfDir, f)).size < 95e6, 'GitHub 한 파일 100MB 제한: ' + f);
+  const withPdf = D.vols.flatMap((v) => v.sections).filter((s) => s.pdf).length;
+  assert(withPdf >= 1180, '원문 쪽을 찾은 절 ' + withPdf);
+  console.log('원문 쪽 보기: 절', withPdf, '개에 PDF 쪽');
+}
+console.log('OK');

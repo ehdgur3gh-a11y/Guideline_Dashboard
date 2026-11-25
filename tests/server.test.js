@@ -125,6 +125,14 @@ async function ask(port, q) {
     const huge = await fetch('http://127.0.0.1:18082/api/ask', { method: 'POST', body: JSON.stringify({ q: 'x'.repeat(20000) }) });
     assert.strictEqual(huge.status, 413, '너무 큰 요청은 연결을 끊지 않고 413');
     console.log('잘못된 요청 → 400·405·413 OK');
+    // 원문 PDF: 바이트 범위 요청(206)
+    if (require('fs').existsSync(require('path').join(__dirname, '..', 'web', 'pdf', '3.pdf'))) {
+      const part = await fetch('http://127.0.0.1:18082/pdf/3.pdf', { headers: { range: 'bytes=0-99' } });
+      assert.strictEqual(part.status, 206);
+      assert.strictEqual(part.headers.get('content-type'), 'application/pdf');
+      assert.strictEqual((await part.arrayBuffer()).byteLength, 100);
+      console.log('원문 PDF → 범위 요청 206 OK');
+    }
   } finally { s2.kill(); }
 
   fake.close();

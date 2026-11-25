@@ -80,6 +80,11 @@
     toast(ok ? (msg || '복사했습니다') : '복사하지 못했습니다 — 글을 직접 선택해 복사하세요');
   }
   const volOf = (s) => D.vols.find((v) => v.id === s.vol);
+  /** 원문 쪽 보기: 편 PDF(web/pdf/<편>.pdf)를 새 창에서 그 쪽으로. PDF가 없거나 쪽을 못 찾은 절은 단추만 흐리게 */
+  function pdfLink(s, page) {
+    if (!page) return `<button type="button" class="btn" disabled title="원문 PDF에서 이 절의 쪽을 찾지 못했습니다">${I.doc}원문 쪽 보기</button>`;
+    return `<a class="btn" href="pdf/${s.vol}.pdf#page=${page}" target="_blank" rel="noopener" title="원문 PDF ${page}쪽을 새 창에서 엽니다 (편마다 처음 한 번 PDF를 받습니다)">${I.doc}원문 쪽 보기</a>`;
+  }
   // 번호 없는 장(참고문헌·부록)은 제목만, 부록 안의 절은 본문 절과 번호가 겹치므로 '부록'을 앞에 붙인다
   const secLabel = (s) => { const t = [s.num, s.title].filter(Boolean).join(' '); return s.chapter === 'app' && s.level > 1 ? '부록 ' + t : t; };
   function citation(s, extra) {
@@ -532,7 +537,7 @@
         <div class="toolbar">
           <span class="muted" style="margin-right:6px">${s.page ? `원문 p.${s.page}~` : s.page_between ? `원문 p.${s.page_between[0]}~${s.page_between[1]} 사이 (목차에 없는 절)` : '원문 쪽 정보 없음'}</span>
           <button type="button" class="btn outline" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>
-          <button type="button" class="btn" disabled title="HWP를 PDF로 변환한 뒤 제공됩니다">${I.doc}원문 쪽 보기</button>
+          ${pdfLink(s, s.pdf)}
           <button type="button" class="btn" data-act="link">${I.link}링크 복사</button>
           <button type="button" class="btn" data-act="print">${I.print}인쇄</button>
           ${q ? `<span class="hitnav"><span>‘${esc(q)}’ <strong data-hitpos>0</strong> / <span data-hittotal>0</span></span><button type="button" data-act="hit-prev" aria-label="이전 일치 항목">${I.up}</button><button type="button" data-act="hit-next" aria-label="다음 일치 항목">${I.down}</button></span>` : ''}
@@ -577,6 +582,7 @@
         <button type="button" class="btn" data-act="copy-table" data-id="${s.id}" data-bi="${bi}">엑셀로 복사</button>
         <button type="button" class="btn" data-act="csv" data-id="${s.id}" data-bi="${bi}">CSV 내려받기</button>
         <a class="btn" href="#/s/${s.id}">본문에서 보기</a>
+        ${pdfLink(s, (s.pdf_tables && s.pdf_tables[+bi]) || s.pdf)}
         <label class="btn" style="margin-left:auto;cursor:text">${I.search}<span class="sr">표 안에서 찾기</span><input data-act="tfilter" type="search" placeholder="표 안에서 찾기" style="border:0;outline:none;width:160px;background:transparent"></label>
       </div>
       <div class="tv-wrap">${renderTable(b, [], ' id="tv"')}</div>
