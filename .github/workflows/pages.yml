@@ -1,11 +1,11 @@
 # GitHub Pages: main에 올릴 때마다 web/ 폴더를 그대로 웹사이트로 낸다.
 # 사이트는 서버 없이 도는 정적 웹이라(질문 답변 기능은 꺼 둠) 이 PC의 http://localhost:8080 과 같게 보인다.
-# 저장소 Settings → Pages → Source가 "GitHub Actions"여야 한다(2026-11-25 설정함). 주소: https://ehdgur3gh-a11y.github.io/Guideline_Dashboard/
+# 저장소 Settings → Pages → Source가 "GitHub Actions"여야 한다. 주소: https://ehdgur3gh-a11y.github.io/Guideline_Dashboard/
+# 2026-11-25: deploy-pages가 "github-pages 묶음을 찾을 수 없음"으로 계속 실패해 gh-pages 브랜치 방식(tools/publish_gh_pages.sh)으로 바꿨다.
+# 그래서 push 때 자동으로 돌지 않고, Actions 탭에서 손으로만 실행한다.
 name: GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
