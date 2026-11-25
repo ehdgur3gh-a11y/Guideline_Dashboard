@@ -52,7 +52,7 @@ const path = require('path');
 const pdfDir = path.join(__dirname, '..', 'web', 'pdf');
 if (fs.existsSync(path.join(pdfDir, '1.pdf'))) {
   assert.strictEqual(sec('1-4.2.1').pdf, 115, '제1편 4.2.1 제당 규모 결정 = 인쇄 105쪽 = PDF 115쪽');
-  assert.strictEqual(sec('1-4.2.1').pdf_tables[25], 117, '[표 4.2.1]은 PDF 117쪽');
+  assert.strictEqual(sec('1-4.2.1').pdf_blocks[25], 117, '[표 4.2.1]은 PDF 117쪽');
   assert.strictEqual(sec('5-1.2.1').pdf, 11, '제5편(모아찍기를 한 쪽씩으로 가른 편) 1.2.1');
   for (const f of fs.readdirSync(pdfDir)) assert(fs.statSync(path.join(pdfDir, f)).size < 95e6, 'GitHub 한 파일 100MB 제한: ' + f);
   const withPdf = D.vols.flatMap((v) => v.sections).filter((s) => s.pdf).length;
@@ -60,3 +60,17 @@ if (fs.existsSync(path.join(pdfDir, '1.pdf'))) {
   console.log('원문 쪽 보기: 절', withPdf, '개에 PDF 쪽');
 }
 console.log('OK');
+
+// 본문 옆 원문 쪽 창: 편마다 쪽 그림이 PDF 쪽 수만큼 있는가
+if (fs.existsSync(path.join(__dirname, '..', 'web', 'pdf-img'))) {
+  for (const v of D.vols) {
+    if (!v.pdf_img) continue;
+    const dir = path.join(__dirname, '..', 'web', 'pdf-img', String(v.id));
+    const n = fs.readdirSync(dir).filter((f) => f.endsWith('.webp')).length;
+    assert.strictEqual(n, v.pdf_pages, `제${v.id}편 쪽 그림 ${n}개 = PDF ${v.pdf_pages}쪽`);
+  }
+  assert(D.vols.every((v) => v.pdf_img), '모든 편에 쪽 그림');
+  const figs = D.vols.flatMap((v) => v.sections).reduce((n, s) => n + Object.keys(s.pdf_blocks || {}).length, 0);
+  assert(figs > 900, '쪽을 찾은 표·그림 제목 ' + figs);
+  console.log('원문 쪽 그림: 7편 모두, 표·그림 제목', figs, '개에 쪽');
+}

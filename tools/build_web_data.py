@@ -54,6 +54,9 @@ index = json.load(open(os.path.join(data_dir, 'index.json'), encoding='utf-8'))
 # 원문 쪽 보기: tools/pdf_pages.py가 만든 절·표 → PDF 쪽 (web/pdf/<편>.pdf가 있는 편만)
 pdf_map_path = os.path.join(data_dir, 'pdf_pages.json')
 pdf_map = json.load(open(pdf_map_path, encoding='utf-8')) if os.path.exists(pdf_map_path) else {}
+# 본문 옆 '원문 쪽' 창의 쪽 그림 (tools/pdf_images.py): 편마다 {pages, w, h}
+img_path = os.path.join(data_dir, 'pdf_images.json')
+pdf_img = json.load(open(img_path, encoding='utf-8')) if os.path.exists(img_path) else {}
 vols = []
 for v in index:
     vol = json.load(open(os.path.join(data_dir, f"vol{v['id']}.json"), encoding='utf-8'))
@@ -77,9 +80,15 @@ for v in index:
                 s['pdf'] = pm['sections'][s['id']]
             tp = {int(k.split('/')[1]): pg for k, pg in pm.get('tables', {}).items() if k.split('/')[0] == s['id']}
             if tp:
-                s['pdf_tables'] = tp
+                s['pdf_blocks'] = tp   # 블록 번호 → PDF 쪽 (제목 있는 표, '[그림 …]' 제목 문단)
         stats['pdf_sections'] = stats.get('pdf_sections', 0) + sum(1 for s in vol['sections'] if s.get('pdf'))
-    vols.append({'id': vol['id'], 'name': vol['name'], 'year': vol['year'], 'sections': vol['sections'], **({'pdf_pages': pm['pages']} if has_pdf else {})})
+    extra = {}
+    if has_pdf:
+        extra['pdf_pages'] = pm['pages']
+        im = pdf_img.get(str(vol['id']))
+        if im and os.path.exists(os.path.join(web_dir, 'pdf-img', str(vol['id']), f"{im['pages']:03d}.webp")):
+            extra['pdf_img'] = {'w': im['w'], 'h': im['h']}
+    vols.append({'id': vol['id'], 'name': vol['name'], 'year': vol['year'], 'sections': vol['sections'], **extra})
 
 out_dir = os.path.join(web_dir, 'data')
 os.makedirs(out_dir, exist_ok=True)

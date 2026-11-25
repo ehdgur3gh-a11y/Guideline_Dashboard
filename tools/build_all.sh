@@ -10,6 +10,7 @@ PY="${PY:-python}"
 PDF_DIR="#참고자료/조사설계실무요령/pdf"
 if ls web/pdf/[0-9].pdf >/dev/null 2>&1; then "$PY" -I tools/pdf_pages.py "$PDF_DIR" data web --map-only | tail -1
 elif [ -d "$PDF_DIR" ]; then "$PY" -I tools/pdf_pages.py "$PDF_DIR" data web | tail -1; fi
+if ls web/pdf/[0-9].pdf >/dev/null 2>&1; then "$PY" -I tools/pdf_images.py data web | tail -1; fi   # 원문 쪽 그림(이미 있는 쪽은 건너뜀)
 "$PY" -I tools/build_web_data.py data web
 "$PY" -I tools/subset_fonts.py tools/fonts-src data web
 node tests/search.test.js

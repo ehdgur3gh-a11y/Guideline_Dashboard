@@ -124,7 +124,13 @@ for vol, path in sorted(sources):
             continue
         stop = next((pages[x['id']] for x in order[si + 1:] if pages.get(x['id'])), n)
         for bi, b in enumerate(s['blocks']):
-            cap = norm(b.get('caption', ''))[:16] if b['t'] == 'table' else ''
+            # 표 제목, 그리고 그림 제목 문단('[그림 4.2.1] 댐 높이') — 본문의 그림 자리를 누르면 원문 창이 그 쪽으로 간다
+            if b['t'] == 'table':
+                cap = norm(b.get('caption', ''))[:16]
+            elif b['t'] == 'p' and re.match(r'^\s*\[그림', b.get('text', '')):
+                cap = norm(b['text'])[:16]
+            else:
+                cap = ''
             if len(cap) < 6:
                 continue
             hit = next((i + 1 for i in range(start - 1, min(n, stop + 1)) if cap in texts[i]), None)
