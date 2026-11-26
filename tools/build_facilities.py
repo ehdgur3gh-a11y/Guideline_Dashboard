@@ -67,7 +67,15 @@ def region(addr):
     sgg = ''
     if len(t) > 1 and re.search(r'(시|군|구)$', t[1]):
         sgg = t[1]
+        # 통합 뒤 '광산구·북구…'만 남으면 어느 도시의 구인지 모른다 → 옛 광주광역시의 구는 '광주 북구'처럼
+        if t[0] == '광주광역시' or (t[0] == '전남광주통합특별시' and sgg in GWANGJU_GU):
+            sgg = '광주 ' + sgg
     return sido, sgg
+
+
+GWANGJU_GU = {'동구', '서구', '남구', '북구', '광산구'}
+# 원자료에서 상식 밖인 값(단위·입력 오류로 보임) — 화면에 '원자료 확인'을 붙인다
+SUSPECT = {('양배수장', '최대양수량'): 100, ('양배수장', '최대배수량'): 100, ('저수지', '제체높이'): 100}
 
 
 out_types = []
@@ -84,12 +92,20 @@ for key, label, cols in TYPES:
         sido, sgg = region(addr)
         done = (r.get('준공년도') or '').strip()[:4]
         vals = [num(r.get(c)) for c, _, _ in cols]
+        warn = []
+        for i, (c, _, unit) in enumerate(cols):
+            v = vals[i]
+            if not unit and isinstance(v, (int, float)):   # 글이어야 할 칸에 수(원자료에서 칸이 밀림: 방조제 부사의 제체형식 10840)
+                vals[i] = None
+            lim = SUSPECT.get((key, c))
+            if lim and isinstance(v, (int, float)) and v > lim:
+                warn.append(i)
         sub = ''
         if key == '양배수장':
             up, dn = num(r.get('최대양수량')) or 0, num(r.get('최대배수량')) or 0
-            sub = '양배수' if up and dn else '배수' if dn else '양수'
-        recs.append([r.get('표준코드', '').strip(), name, addr, sido, sgg, done, (r.get('구분') or '').strip(), sub,
-                     (r.get('지사') or '').strip(), (r.get('연락처') or '').strip(), vals])
+            sub = '양배수' if up and dn else '배수' if dn else '양수' if up else ('배수' if '배수' in name else '양수' if '양수' in name else '미상')
+        recs.append([(r.get('표준코드') or '').strip(), name, addr, sido, sgg, done, (r.get('구분') or '').strip(), sub,
+                     (r.get('지사') or '').strip(), (r.get('연락처') or '').strip(), vals, warn])
     total += len(recs)
     out_types.append({'key': key, 'label': label, 'cols': [[n, u] for _, n, u in cols], 'rows': recs})
     print(key, len(recs), file=sys.stderr)
@@ -99,7 +115,7 @@ PRESENT = {'source': '농업생산 기반정비 통계연보 2024 (RAWRIS 농업
            'rows': [['저수지', 16973, 3428, 13545], ['양(배)수장', 9797, 5008, 4789], ['취입보', 18534, 4168, 14366],
                     ['집수암거', 2599, 297, 2302], ['관정', 30245, 1578, 28667], ['방조제', 1676, 144, 1532]],
            'total': [78148, 14479, 63669]}
-payload = {'fields': ['code', 'name', 'addr', 'sido', 'sgg', 'done', 'kind', 'sub', 'jisa', 'tel', 'vals'],
+payload = {'fields': ['code', 'name', 'addr', 'sido', 'sgg', 'done', 'kind', 'sub', 'jisa', 'tel', 'vals', 'warn'],
            'types': out_types, 'guide': GUIDE, 'dates': DATES, 'present': PRESENT,
            'source': '공공데이터포털 한국농어촌공사_농업기반시설 시설제원 (공사관리 시설)'}
 os.makedirs(os.path.join(web, 'data'), exist_ok=True)

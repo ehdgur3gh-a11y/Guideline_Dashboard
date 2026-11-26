@@ -15,33 +15,48 @@ const S = globalThis.KRCSearch;
 
 const MARK = /^\s*(?:[가-하]\.|[가-하]\)|\(?[가-하]\)|\d+\.|\d+\)|\(\d+\)|[①-⑳]|[-·○ㅇ•※])\s*/;
 const DEFV = /(말한다|뜻한다|의미한다|일컫는다|정의한다|가리킨다|말함|뜻함)\.?$/;
-const DEFV2 = /(것|면|선|값|양|량|위|높이|구조물|이음|시설|시험|조사|측량|토지|갯벌|계수|각|비|율|용수|유량|수위|성분|중량|방식|시설물)(이다|임)?\.?$/;
+const DEFV2 = /(것|면|선|값|양|량|위|높이|구조물|이음|시설|시험|조사|측량|토지|갯벌|계수|각|비|율|용수|유량|수위|성분|중량|방식|시설물|조석|수로|드레인|도표)(이다|임)?\.?$/;
 const clean = (t) => t.replace(/[“”"‘’「」]/g, '').replace(/\s+/g, ' ').trim();
-// 사람이 걸러 낸 것: 정의가 아닌데 꼴이 맞아 걸린 말
-const DROP = new Set(['기타', '시행전 분석방향', '적산', '깬자갈 생산준비', '대상지구의 유역', '담수화 과정', '개발면적', '사업장폐기물',
-  '간척 및 매립', '간석지 및 간척지', '산의 높이', '1Lugeon',
-  // 수식 기호 설명·산출식·항목 나열·법령 조항 (정의가 아님)
+// 앞 문장을 받는 말('이 조석의 파를…', '이와 같이…')은 떼어 정의만 읽히게
+const LEAD = /^(?:이와 같이|이와 같은|이러한|그러나|그러므로|그리고|또한|따라서|즉|이때|이것이|또|이)\s+/;
+// 사람이 걸러 낸 것 (검토 6·9차): 정의가 아닌데 꼴이 맞아 걸린 말
+const DROP = new Set(['기타', '시행전 분석방향', '적산', '깬자갈 생산준비', '대상지구의 유역', '담수화 과정', '개발면적',
+  '간척 및 매립', '간석지 및 간척지', '산의 높이', '1Lugeon', '간출암의 높이', '환경보전비산출', '활성화', '초과하는 확률이므로 위험도', '위험도',
+  '구성', '구획계획', '포장의 구획', '입구에 설치', '총칭하여 외압', 'logCv−logP 곡선', '부진동', '급조', '동상방지층', '공사의 예정가격', '견적가격', '내용적',
+  // 수식 기호 설명·산출식·항목 나열·법령 조항
   '계상기준', '계약서 근거에 의하는 비목', '계획배수로 제원', '고용보험료산출', '국민건강보험료산출', '국민연금보험료산출', '노인장기요양보험료산출',
   '농어촌 도로의 구조‧시설기준', '도로망 조사', '도로의 구조‧시설기준', '목 적', '법령에 의해 산출하는 비목', '비산먼지 방지시설', '사석재 통과량을 고려할 경우',
   '산출', '소음ㆍ진동 방지시설', '수굴, 오거보링', '수위차', '수질오염 방지시설', '실비로 계상하는 비목', '외수위', '용수로 제원', '인수로 단면계산', '종단선형',
   '지구외 산지등', '지급보증서 발급금액', '지장물조사', '지적선', '측량항목', '치수계획', '평면선형', '품셈에 의하여 산출하는 비목', '하중조합계수', '반조차']);
+// 용어는 맞지만 이 정의는 아닌 것: '용어|절'
+const DROP_DEF = new Set(['폐기물처리시설|6-5.2.13', '내부마찰각|1-4.3.2', '조차|5-10.2.2']);
+const TERM_FIX = { '총칭하여 연결수로': '연결수로', 'A군': '수문학적 토양군 A', 'B군': '수문학적 토양군 B', 'C군': '수문학적 토양군 C', 'D군': '수문학적 토양군 D',
+  '처리': '폐기물 처리', '처분': '폐기물 처분', '견적가격 또는 입찰가격': '견적가격' };
+const ALT_FIX = { 'High water ordinary meaan tide': 'High water ordinary mean tide', 'Low water ordinary mean Ttde': 'Low water ordinary mean tide', 'Approx, lowest low water level': 'Approx. lowest low water level' };
+const KEEP_LATIN = new Set(['CFRD']);
 
 function splitTerm(raw) {
   let t = clean(raw).replace(/\s*\((?:이하|이하에서)[^)]*\)?/g, '').replace(/[,·]$/, '');
   let alt = '';
   const m = /^(.+?)\s*\(([^()]+)\)\s*$/.exec(t);
   if (m) { t = m[1].trim(); alt = m[2].trim(); }
+  t = TERM_FIX[t] || t;
+  alt = ALT_FIX[alt] || alt;
+  if (alt && /[가-힣]/.test(alt) && !/[A-Za-z一-龥]/.test(alt)) alt = '';   // 한글 메모는 다른 이름이 아님
   return { t, alt };
 }
-const ok = (t) => t.length >= 2 && t.length <= 22 && !/[다요함]$/.test(t) && !/^\d/.test(t) && !/[=→<>]/.test(t) && t.split(' ').length <= 4 &&
-  !/^(식에서|여기서|단|주|예|참고|비고|그림|표|이|그|또한|따라서|이때|이 경우)$/.test(t) && !/^(여기서|위 식에서|식에서|다만)|^[(△]/.test(t) && !/^[A-Z]{2,}$/.test(t) && !DROP.has(t);
+// 용어: 한글이 들어 있어야(수식 기호 F.S·H0·W±… 제외), 22자 이하, 문장 끝이 아닌 말
+const ok = (t) => t.length >= 2 && t.length <= 22 && (/[가-힣]/.test(t) || KEEP_LATIN.has(t)) && !/라\s?하여|[₀-₉△]/.test(t) && !/[다요함]$/.test(t) && !/^\d/.test(t) && !/[=→<>±]/.test(t) &&
+  t.split(' ').length <= 4 && !/^(식에서|여기서|단|주|예|참고|비고|그림|표|이|그|또한|따라서|이때|이 경우)$/.test(t) && !/^(여기서|위 식에서|식에서|다만)|^[(△]/.test(t) && !DROP.has(t);
+// 여러 문장이면 정의 문장(첫 문장)만 — '민법상 도급 …를 말한다. 건설산업기본법에서는…' 처럼 이어지지 않게
+const firstSentence = (d) => { const m = /^(.+?(?:말한다|뜻한다|의미한다|일컫는다|이다|한다)\.)\s+\S/.exec(d); return m ? m[1] : d; };
 
 const out = [];
 const seen = new Set();
 function add(rule, s, bi, rawTerm, def) {
   const { t, alt } = splitTerm(rawTerm);
-  if (!ok(t)) return;
-  def = clean(def);
+  if (!ok(t) || DROP_DEF.has(t + '|' + s.id)) return;
+  def = firstSentence(clean(def).replace(LEAD, ''));
   if (def.length < 8) return;
   const key = S.norm(t) + '|' + s.id;
   if (seen.has(key)) return;
@@ -50,7 +65,8 @@ function add(rule, s, bi, rawTerm, def) {
 }
 
 for (const v of window.KRC_DATA.vols) for (const s of v.sections) {
-  const glossSec = /용어|정의|약어/.test(s.title);
+  // 용어 절: '용어의 정의', '조위 관련용어', '정의', '…의 정의' ('전양정의 결정'은 아님)
+  const glossSec = /용어|약어|(^|의 |\s)정의$/.test(s.title) && s.id !== '7-3.2.3';   // 7-3.2.3은 시방서 문장 쓰는 법
   s.blocks.forEach((b, bi) => {
     if (b.t === 'p' && !b.caption_of_prev) {
       const t = S.plainText(b).trim();
@@ -58,17 +74,21 @@ for (const v of window.KRC_DATA.vols) for (const s of v.sections) {
       const body = t.replace(MARK, '');
       let m;
       if ((m = /^([^:：]{2,30}?)\s*[:：]\s*(.{8,})$/.exec(body)) && (DEFV.test(m[2]) || DEFV2.test(m[2]))) add(1, s, bi, m[1], m[2]);
-      else if ((m = /^(.{2,30}?)(?:이)?(?:란|라 함은|이라 함은)\s+(.{6,})$/.exec(body)) && DEFV.test(m[2])) add(2, s, bi, m[1], m[2]);
-      else if (glossSec && hasMark && (m = /^(.{2,40}?)(?:은|는)\s+(.{8,})$/.exec(body)) && (DEFV.test(m[2]) || /이다\.?$/.test(m[2]))) add(3, s, bi, m[1], m[2]);
-      else if (glossSec && /^\d+\.\s/.test(t) && t.length < 70) {
-        const nx = s.blocks.slice(bi + 1, bi + 4).find((x) => x.t === 'p' && !/^\d+\.\s/.test(x.text) && !/=/.test(x.text));
-        if (nx) add(4, s, bi, body, S.plainText(nx));
+      else if ((m = /^(.{2,30}?)(?:이)?(?:란|라 함은|이라 함은)\s+(.{6,})$/.exec(body)) && (DEFV.test(m[2]) || /이다\.?$/.test(m[2]))) add(2, s, bi, m[1], m[2]);
+      else if (glossSec && hasMark && (m = /^(.{2,40}?)(?:은|는)\s+(.{8,})$/.exec(body)) && /다\.?$/.test(m[2])) add(3, s, bi, m[1], m[2]);
+      else if (glossSec && /^\d+[.)]\s/.test(t) && t.length < 70) {   // ④ 용어 절의 '1. 고극조위 (…)' 제목 + 다음 문단(사이의 식은 덧붙임)
+        const next = s.blocks.slice(bi + 1, bi + 4);
+        const nx = next.find((x) => x.t === 'p' && !/^\d+[.)]\s/.test(x.text) && !/=/.test(x.text));
+        const eq = next.find((x) => x.t === 'p' && /=/.test(x.text) && x.text.length < 60 && next.indexOf(x) < next.indexOf(nx));
+        if (nx) add(4, s, bi, body, S.plainText(nx) + (eq ? ` (${clean(S.plainText(eq))})` : ''));
       }
-      // ⑤ 문장 안 '…을 X(이)라 한다' — 한 문장에 하나만 있을 때
-      for (const sent of t.split(/(?<=다\.)\s+/)) {
-        if ((sent.match(/라(?:고)? 한다/g) || []).length !== 1 || /라 하고/.test(sent)) continue;
-        const m5 = /^(.{10,160})(?:을|를)\s+([가-힣A-Za-z][^,.]{1,20}?)(?:이)?라(?:고)? (?:한다|부른다)/.exec(sent.replace(MARK, ''));
-        if (m5) add(5, s, bi, m5[2], sent.replace(MARK, ''));
+      // ⑤ 문장 안 '…을 X(이)라 한다' — 'A를 X라 하고, B를 Y라 한다'는 나눠서 둘 다
+      for (const sent of t.replace(MARK, '').split(/(?<=다\.)\s+/)) {
+        const clauses = sent.split(/(?<=라\s?하고|라고\s?하고|라\s?하며|라고\s?하며)\s*,?\s*/);
+        for (const cl of clauses) {
+          const m5 = /^(.{6,160})(?:을|를)\s+([가-힣A-Za-z][^,.]{0,20}?)(?:이)?라(?:고)?\s*(?:한다|하고|하며|부른다)/.exec(cl);
+          if (m5) add(5, s, bi, m5[2], cl.replace(/라(고)?\s?(하고|하며)$/, '라$1 한다.'));
+        }
       }
     } else if (b.t === 'table' && b.caption && /용어/.test(b.caption)) {
       const rows = {};
