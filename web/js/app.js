@@ -38,12 +38,13 @@
     outline: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',
     share: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>',
     x: '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    clock: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     book: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>',
     home: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-6h4v6"/></svg>',
     dam: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20l4-11h4l4 11"/><path d="M3 14c2-1.3 3.5-1.3 5 0"/></svg>',
     check: '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
   };
-  const fac = (d) => `<svg aria-hidden="true" width="36" height="36" viewBox="0 0 40 40" fill="none" stroke="#1F5FAD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const fac = (d) => `<svg aria-hidden="true" width="36" height="36" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const FACILITIES = [
     ['저수지', '1-ch4', '<path d="M4 30h32"/><path d="M14 30l6-16h6l6 16"/><path d="M4 22c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M4 26c2-1.5 4-1.5 6 0s4 1.5 6 0"/>'],
     ['양수장', '1-ch5', '<rect x="6" y="16" width="16" height="16" rx="1"/><path d="M6 16l8-6 8 6"/><path d="M22 24h6v-12h6"/><path d="M31 9l3 3-3 3"/>'],
@@ -483,7 +484,7 @@
         <label class="sr" for="scope-${big ? 'h' : 't'}">검색 범위</label>
         <select id="scope-${big ? 'h' : 't'}" name="scope">${opt('all', '통합')}${opt('title', '절 번호·제목')}${opt('body', '본문')}${opt('table', '표')}</select>
         <label class="sr" for="q-${big ? 'h' : 't'}">검색어 또는 절 번호</label>
-        <input id="q-${big ? 'h' : 't'}" name="q" type="search" value="${esc(q || '')}" placeholder="${!wide(359) ? '검색어·절 번호' : !wide(700) ? '검색어 또는 절 번호' : FEATURES.ask ? '검색어, 절 번호 또는 질문을 입력하세요' : '검색어나 절 번호를 입력하세요 (문장으로 써도 됩니다)'}" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ac-${big ? 'h' : 't'}" aria-autocomplete="list">
+        <input id="q-${big ? 'h' : 't'}" name="q" type="search" value="${esc(q || '')}" placeholder="${!wide(420) ? '검색어·절 번호' : !wide(700) ? '검색어 또는 절 번호' : FEATURES.ask ? '검색어, 절 번호 또는 질문을 입력하세요' : '검색어나 절 번호를 입력하세요 (문장으로 써도 됩니다)'}" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ac-${big ? 'h' : 't'}" aria-autocomplete="list">
         <button type="submit" aria-label="검색">${I.search}<span class="bt">검색</span></button>
       </div>
       <div class="ac" id="ac-${big ? 'h' : 't'}" role="listbox" hidden></div>
@@ -545,6 +546,10 @@
     store.set('krc.recent', list.join(','));
   }
   /* 저장한 절 (☆, 이 기기에만, 최대 50개) — 자주 보는 기준을 한 번에 다시 열게 */
+  // 최근 검색어(이 기기에만) — 빈 검색칸을 누르면 보여 준다
+  const rqGet = () => { try { const v = JSON.parse(store.get('krc.rq', '[]')); return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : []; } catch (e) { return []; } };
+  const rqAdd = (q) => { const t = q.trim().slice(0, 60); if (!t) return; store.set('krc.rq', JSON.stringify([t, ...rqGet().filter((x) => x !== t)].slice(0, 10))); };
+  const rqDel = (q) => store.set('krc.rq', JSON.stringify(rqGet().filter((x) => x !== q)));
   const savedGet = () => store.get('krc.saved', '').split(',').filter((id) => id && idx.byId.has(id));
   function savedToggle(id) {
     const list = savedGet();
@@ -589,18 +594,11 @@
       </div></header>
       <main id="main" class="home-main">
         <section class="hero" aria-label="검색">
-          <h1>조사설계실무요령</h1>
+          <h1>무엇을 찾으세요?</h1>
+          <p class="lead">본문 ${idx.sections.length.toLocaleString('ko-KR')}개 절 · 용어 ${GL.length}개에서 찾습니다</p>
           <div class="row">${searchForm('', 'all', true)}${FEATURES.ask ? `<a class="ask" href="#/ask" data-act="ask">${I.ask}질문하기</a>` : ''}</div>
-          <p class="ex">예: <a href="#/search?q=${q2('여유고')}">여유고</a> · <a href="#/search?q=${q2('물넘이')}">물넘이</a> · <a href="#/s/1-4.2.1">4.2.1</a> · <a href="#/search?q=${q2('물넘이 게이트가 없는 필댐의 여유고')}">물넘이 게이트가 없는 필댐의 여유고</a></p>
+          <p class="ex"><span class="sr">예: </span>${[['여유고', `#/search?q=${q2('여유고')}`], ['물넘이', `#/search?q=${q2('물넘이')}`], ['4.2.1', '#/s/1-4.2.1'], ['필댐의 여유고는?', `#/search?q=${q2('물넘이 게이트가 없는 필댐의 여유고')}`]].map(([l, h]) => `<a class="tchip" href="${h}">${l}</a>`).join('')}</p>
         </section>
-        <nav class="quick" aria-label="바로가기"><a href="#/s/1-ch1">${I.list}전체 목차</a><a href="#/tables">${I.table}표 모음</a><a href="#/saved">${I.bookmark}저장한 절</a></nav>
-        ${mineHtml()}
-        <section class="guide" aria-label="이렇게 쓰면 편합니다"><h2>이렇게 쓰면 편합니다</h2><ol>
-          <li><a href="#/" data-act="search-jump"><strong>1</strong><span>검색으로 찾기<small>낱말·문장·절 번호</small></span></a></li>
-          <li><a href="#/terms"><strong>2</strong><span>모르는 용어<small>원문 정의 ${GL.length}개</small></span></a></li>
-          <li><a href="#/flow"><strong>3</strong><span>업무 흐름<small>단계마다 할 일</small></span></a></li>
-          <li><a href="#/fac"><strong>4</strong><span>내 지구 시설<small>저수지·양수장 제원</small></span></a></li>
-        </ol></section>
         <section class="facilities" aria-label="시설·분야로 찾기">
           <div class="head"><h2>시설·분야로 찾기</h2><a href="#/flow">업무 흐름으로 보기 →</a></div>
           <div class="tiles">${FACILITIES.map(([n, id, d]) => `<a class="tile" href="#/s/${id}"><span class="ic">${fac(d)}</span>${n}</a>`).join('')}</div>
@@ -618,6 +616,7 @@
     document.title = `‘${q}’ 검색 — 조사설계실무요령`;
     if (!q.trim()) return topbar('', scope, null, '') + `<main id="main" class="page"><div class="main"><p class="empty">검색어를 입력하세요.</p></div></main>${bottomnav('home')}`;
 
+    rqAdd(q);
     if (scope === 'title') return viewTitleSearch(q, scope);
     const r = idx.search(q, { vols, scope });
     const tables = tablesMatching(q).list;
@@ -654,7 +653,7 @@
         </div><button type="button" class="icon-btn" data-act="cite" data-id="${s.id}" aria-label="출처 복사" title="출처 복사">${I.copy}</button></li>`;
     }).join('');
     // 시설 이름('용천저수지')이면 맨 위에 시설정보 카드 — 시설 자료(445KB)는 결과가 없거나 시설 종류 말이 들어 있을 때만 받는다
-    const wantFac = scope !== 'body' && (window.KRC_FAC || r.hits.length === 0 || FAC_WORD.test(q));
+    const wantFac = scope !== 'body' && (vTotal === 0 || FAC_WORD.test(q));
     if (wantFac && !window.KRC_FAC) {
       loadFac().then(() => {
         const slot = app.querySelector('[data-slot="fachit"]');
@@ -662,7 +661,8 @@
       }, () => { /* 못 받으면 카드 없이 */ });
     }
     const facSlot = wantFac ? (window.KRC_FAC ? facHitHtml(q) : '<div data-slot="fachit"></div>') : '';
-    const nothing = !r.hits.length && !numCards && !defHit;
+    const nothing = !vTotal && !numCards && !defHit;
+    const filteredOut = !r.hits.length && vTotal > 0;   // 고른 편에만 없을 때(옛 주소 등)
     const emptyHtml = `<section class="empty card noresult"><p class="big">실무요령 본문에서 ‘${esc(q)}’을(를) 찾지 못했습니다</p>
         <p class="muted">이렇게 찾아보세요 — 짧은 낱말, 절 번호, 다른 표기</p>
         <p class="ex">${['저수지', '물넘이', '여유고', '4.2.1'].map((x) => `<a class="tchip" href="#/search?q=${q2(x)}">${x}</a>`).join('')}</p>
@@ -676,7 +676,7 @@
         ${vchips}${sumLine}
         <div class="summary"><span class="muted">‘${esc(q)}’ <strong style="color:var(--ink)">${r.hits.length}개 절</strong> · ${r.total}문단</span>${notes.join('')}</div>
         ${facSlot}${defHit ? defCard(defHit) : ''}${numCards}${titleCards}
-        ${items ? `<ol class="results">${items}</ol>${more}` : nothing ? emptyHtml : ''}
+        ${items ? `<ol class="results">${items}</ol>${more}` : nothing ? emptyHtml : filteredOut ? `<p class="empty card">고른 편에는 ‘${esc(q)}’이(가) 없습니다. <a href="${vHref(0)}">전체 편에서 보기 (${vTotal}개 절)</a></p>` : ''}
       </div>
       <aside class="side">
         ${FEATURES.ask ? `<a class="card titlehit" style="background:var(--surface)" href="#/ask?q=${q2(q)}"><span class="k">${I.ask} 질문으로 찾기</span><span>${esc(q)}</span></a>` : ''}
@@ -1003,7 +1003,7 @@
     const next = v.sections[s.order + 1];
     const path = idx.path(s);
     // 폰 머리줄: ← · 절 번호·제목 · 차례 · ⋯ (검색칸·목차·경로가 본문을 밀어내지 않게. 넓은 화면은 그대로)
-    const rhead = `<header class="rhead"><button type="button" class="icon-btn" data-act="back" aria-label="뒤로">${I.back}</button><span class="rt">${esc([s.num, s.title].filter(Boolean).join(' '))}</span><button type="button" class="rbtn" data-act="outline" aria-haspopup="dialog">${I.outline}차례</button><span class="rmenu-wrap"><button type="button" class="icon-btn" data-act="rmenu" aria-label="더 보기" aria-controls="rmenu" aria-expanded="false">${I.dots}</button><div class="rmenu" id="rmenu" aria-label="이 절" hidden><button type="button" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>${canShare() ? `<button type="button" data-act="linkcopy">${I.link}링크 복사</button>` : ''}<button type="button" data-act="scale">${I.text}글자 크기</button><a href="#/saved">${I.bookmark}저장한 절</a><button type="button" data-act="search-jump">${I.search}새 검색</button></div></span></header>`;
+    const rhead = `<header class="rhead"><button type="button" class="icon-btn" data-act="back" aria-label="뒤로">${I.back}</button><span class="rt">${esc([s.num, s.title].filter(Boolean).join(' '))}</span><button type="button" class="rbtn" data-act="outline" aria-haspopup="dialog">${I.outline}차례</button><span class="rmenu-wrap"><button type="button" class="icon-btn" data-act="rmenu" aria-label="더 보기" aria-controls="rmenu" aria-expanded="false">${I.dots}</button><div class="rmenu" id="rmenu" aria-label="이 절" hidden><button type="button" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>${canShare() ? `<button type="button" data-act="link">${I.share}공유</button>` : ''}<button type="button" data-act="find-in">${I.search}이 절에서 찾기</button><button type="button" data-act="linkcopy">${I.link}링크 복사</button><button type="button" data-act="scale">${I.text}글자 크기</button><a href="#/saved">${I.bookmark}저장한 절</a><button type="button" data-act="search-jump">${I.search}새 검색</button></div></span></header>`;
     return topbar(q, 'all', 'toc', '', 'has-rhead') + rhead + `<main id="main" class="page">
       <nav class="toc" aria-label="목차"><details${wide(1100) ? ' open' : ''}>
         <summary>목차 — 제${v.id}편 ${esc(v.name)} · ${esc(curCh.num)} ${esc(curCh.title)}</summary>
@@ -1019,7 +1019,7 @@
           <button type="button" class="btn outline" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>
           ${saveBtn(s)}
           ${pdfToggle(s, s.pdf)}
-          <span class="rmenu-wrap tmore"><button type="button" class="btn" data-act="rmenu" aria-label="더 보기 (링크·인쇄)" aria-controls="tmenu" aria-expanded="false">${I.dots}</button><div class="rmenu" id="tmenu" aria-label="더 보기" hidden><button type="button" data-act="link">${canShare() ? `${I.share}공유` : `${I.link}링크 복사`}</button><button type="button" data-act="print">${I.print}인쇄</button></div></span>
+          <span class="rmenu-wrap tmore"><button type="button" class="btn" data-act="rmenu" aria-label="더 보기 (링크·인쇄)" aria-controls="tmenu" aria-expanded="false">${I.dots}</button><div class="rmenu" id="tmenu" aria-label="더 보기" hidden><button type="button" data-act="find-in">${I.search}이 절에서 찾기</button><button type="button" data-act="link">${canShare() ? `${I.share}공유` : `${I.link}링크 복사`}</button><button type="button" data-act="print">${I.print}인쇄</button></div></span>
           ${q ? `<span class="hitnav" data-q="${esc(q)}"><span>‘${esc(q)}’ <strong data-hitpos>0</strong> / <span data-hittotal>0</span></span><button type="button" data-act="hit-prev" aria-label="이전 일치 항목">${I.up}</button><button type="button" data-act="hit-next" aria-label="다음 일치 항목">${I.down}</button><button type="button" class="hit-off" data-act="hit-off" aria-label="찾은 말 표시 끄기">${I.x}</button></span>` : ''}
         </div>
         <div class="content">${s.blocks.length ? renderBlocks(s, alts) : (kids.length ? `<p class="muted">이 ${s.level === 1 ? '장' : '절'}은 아래 항목으로 이루어져 있습니다.</p><ul class="children">${kids.map((k) => `<li><a href="#/s/${k.id}">${numTag(k.num)}${esc(k.title)}<span class="muted" style="margin-left:auto">${k.page ? 'p.' + k.page : ''}</span></a></li>`).join('')}</ul>` : '<p class="muted">본문이 없습니다.</p>')}</div>
@@ -1208,10 +1208,10 @@
   function viewTable(id, bi) {
     const s = idx.byId.get(id);
     const b = s && s.blocks[+bi];
-    if (!b || b.t !== 'table') return topbar('', 'table', 'tables') + `<main id="main" class="page"><div class="empty card"><p>표를 찾을 수 없습니다.</p><p>${s ? `<a href="#/s/${s.id}">${esc(s.num)} ${esc(s.title)} 본문 보기</a> · ` : ''}<a href="#/tables">표 모음 보기</a></p></div></main>${bottomnav('tables')}`;
+    if (!b || b.t !== 'table') return topbar('', 'all', 'tables') + `<main id="main" class="page"><div class="empty card"><p>표를 찾을 수 없습니다.</p><p>${s ? `<a href="#/s/${s.id}">${esc(s.num)} ${esc(s.title)} 본문 보기</a> · ` : ''}<a href="#/tables">표 모음 보기</a></p></div></main>${bottomnav('tables')}`;
     document.title = `${b.caption || '표'} — 조사설계실무요령`;
     const tvCards = tableCards(b, []);
-    return topbar('', 'table', 'tables') + `<main id="main" class="page"><div class="main">
+    return topbar('', 'all', 'tables') + `<main id="main" class="page"><div class="main">
       <p class="path" style="margin:0">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page + '~' : ''}</p>
       <h1 class="tv-title">${esc(b.caption || '표')}</h1>
       <div class="toolbar tv-tools" style="border:0;margin:0;padding:0">
@@ -1223,6 +1223,7 @@
         ${pdfToggle(s, (s.pdf_blocks && s.pdf_blocks[+bi]) || s.pdf)}
         <label class="btn tv-find">${I.search}<span class="sr">표 안에서 찾기</span><input data-act="tfilter" type="search" spellcheck="false" autocomplete="off" placeholder="표 안에서 찾기"></label>
       </div>
+      <p class="tv-count" role="status" aria-live="polite"></p>
       ${tvCards ? `<div class="tv-card cardable${tview() === 'grid' ? ' as-grid' : ''}">` : ''}<div class="tv-wrap">${renderTable(b, [], ' id="tv"')}</div>${tvCards}${tvCards ? '</div>' : ''}
       <p class="muted" style="margin:0;font-size:.9375rem">원문 표의 병합 셀을 그대로 옮겼습니다. 엑셀 복사·CSV에서 수식은 한 줄 글(예: D15F/D85B &lt; 5)로 바뀝니다.</p>
       <p class="print-cite">출처: ${esc(citation(s, b.caption))}</p>
@@ -1308,22 +1309,32 @@
     return facLoading;
   }
   const FAC_WORD = /저수지|양수장|배수장|양배수장|취입보|방조제|관정|집수암거|지구/;
-  // 검색어에서 시설 종류 말을 떼고 시설 이름과 맞춰 본다(이름이 같거나 그 이름으로 시작)
-  function facHitHtml(q) {
+  // 검색어에서 시설 종류 말을 떼고 시설 이름과 맞춰 본다(이름이 같거나 그 이름으로 시작) — 검색 카드·자동완성이 같이 쓴다
+  function facFind(q) {
     const F = window.KRC_FAC;
-    if (!F) return '';
+    if (!F) return null;
     const name = S.norm(q.replace(/\s*(양배수장|양수장|배수장|저수지|취입보|방조제|관정|집수암거|지구)\s*$/, ''));
-    if (name.length < 2) return '';
+    if (name.length < 2) return null;
     const hits = [];
     F.types.forEach((t) => t.rows.forEach((r) => { const n = S.norm(r[1]); if (n === name || n.startsWith(name)) hits.push({ t, r, exact: n === name }); }));
-    if (!hits.length) return '';
+    if (!hits.length) return null;
     const typeWord = (q.match(/(저수지|양수장|배수장|취입보|방조제|관정|집수암거)\s*$/) || [])[1];
     const want = (h) => (typeWord ? (typeWord === h.t.key || (h.t.key === '양배수장' && /양수장|배수장/.test(typeWord)) ? 0 : 1) : 0);
     hits.sort((a, b) => want(a) - want(b) || (b.exact - a.exact));
-    const first = hits[0];
-    const kind = (h) => (h.t.key === '양배수장' && h.r[7] && h.r[7] !== '미상' ? `${h.r[7]}장` : h.t.label);
+    return { name, hits };
+  }
+  const facKind = (h) => (h.t.key === '양배수장' && h.r[7] && h.r[7] !== '미상' ? `${h.r[7]}장` : h.t.label);
+  function facHitHtml(q) {
+    const found = facFind(q);
+    if (!found) return '';
+    const { name, hits } = found;
+    const kind = facKind;
     const rows = hits.slice(0, 3).map((h) => `<a href="#/fac?${new URLSearchParams({ t: h.t.key, q: h.r[1], id: h.r[0] })}"><strong>${esc(h.r[1])}</strong> <span class="muted">${esc(kind(h))} · ${esc([h.r[3], h.r[4]].join(' '))}</span></a>`).join('');
-    return `<section class="card fachit"><p class="k">${I.dam}시설정보에서 찾음 · ${hits.length.toLocaleString('ko-KR')}곳</p>${rows}${hits.length > 3 ? `<a class="all" href="#/fac?${new URLSearchParams({ t: first.t.key, q: first.r[1] })}">시설정보에서 모두 보기 →</a>` : ''}</section>`;
+    // 종류별로 바로 가기(숫자는 이름이 맞는 곳 수 — 목록은 주소에 든 곳까지 더 보여 줄 수 있다)('용천': 저수지 4 · 양배수장 4 · 관정 2 …)
+    const byType = [];
+    hits.forEach((h) => { const g = byType.find((x) => x.t === h.t); if (g) g.n++; else byType.push({ t: h.t, n: 1 }); });
+    const more = hits.length > 3 || byType.length > 1 ? `<p class="types">${byType.map((g) => `<a href="#/fac?${new URLSearchParams({ t: g.t.key, q: name })}">${esc(g.t.label)} ${g.n.toLocaleString('ko-KR')} →</a>`).join('')}</p>` : '';
+    return `<section class="card fachit"><p class="k">${I.dam}시설정보에서 찾음 · ${hits.length.toLocaleString('ko-KR')}곳</p><div class="rows">${rows}</div>${more}</section>`;
   }
   const FAC_KEY_STAT = { 저수지: '총저수량', 양배수장: '수혜면적', 취입보: '수혜면적', 방조제: '제체 길이', 관정: '일 양수량', 집수암거: '매설 길이' };
   const fmtNum = (v) => (typeof v === 'number' ? v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : esc(String(v)));
@@ -1365,6 +1376,7 @@
     // 시설명·주소에 더해 시도·시군구 이름으로도 찾는다('광주'로 찾으면 통합 전 주소인 시설도)
     const hit = (r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq) || S.norm(r[3] + r[4]).includes(nq));
     const rows = type.rows.filter((r) => hit(r) && (!sub || r[7] === sub || r[7] === '양배수'));
+    if (sub) rows.sort((a, b) => (a[7] === sub ? 0 : 1) - (b[7] === sub ? 0 : 1));   // '배수장'을 고르면 배수 전용을 먼저, 양배수 겸용은 뒤에
     const per = 50, shown = rows.slice(0, page * per);
     const ki = type.cols.findIndex(([n]) => n === FAC_KEY_STAT[type.key]);
     const P = F.present;
@@ -1378,7 +1390,7 @@
       const specs = type.cols.map(([n, u], i) => (r[10][i] == null || r[10][i] === 0 || r[10][i] === '' ? '' : `<div${warn.has(i) ? ' class="warn"' : ''}><dt>${esc(n)}</dt><dd>${fmtNum(r[10][i])}${u ? ` <small>${esc(u)}</small>` : ''}${warn.has(i) ? ' <small class="wn">원자료 값 — 확인 필요</small>' : ''}</dd></div>`)).join('');
       const g = guideOf(r);
       return `<li><details${open === r[0] ? ' open' : ''}><summary>
-          <span class="fh"><strong>${esc(r[1])}</strong><span class="muted">${esc(type.label)}${r[7] ? `(${esc(r[7])})` : ''} · ${esc(r[6] || '')}</span>${stat ? `<span class="st">${stat}</span>` : ''}</span>
+          <span class="fav" aria-hidden="true">${I.dam}</span><span class="fh"><strong>${esc(r[1])}</strong><span class="muted">${esc(type.label)}${r[7] ? `(${esc(r[7])})` : ''} · ${esc(r[6] || '')}</span>${stat ? `<span class="st">${stat}</span>` : ''}</span>
           <span class="muted fa">${esc(r[2])}${r[5] ? ` · ${esc(r[5])}년 준공` : ''}</span>
         </summary>
         <div class="fbody">
@@ -1582,7 +1594,7 @@
       if (after && after.offsetParent === null) after = null;   // 숨은 칸(폰의 목차 등)이면 제목으로
       focusAfter = null;
       // 편 칩·필터를 바꾼 경우는 고른 칩에, '더 보기'면 새로 나온 첫 항목에
-      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : keep.more ? app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a, .faclist > li:nth-child(${keep.count + 1}) summary`) : app.querySelector('.vchips [aria-current], .chips [aria-current]'));
+      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : keep.more ? app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a, .faclist > li:nth-child(${keep.count + 1}) summary`) : [...app.querySelectorAll('.vchips [aria-current], .chips [aria-current]')].find((x) => x.offsetParent !== null));
       const h1 = app.querySelector('h1');
       if (next) next.focus({ preventScroll: true });
       else if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
@@ -1653,14 +1665,53 @@
     let sel = -1;
     const opts = () => [...box.querySelectorAll('.opt')];
     const close = () => { box.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); sel = -1; };
+    function show(parts) {
+      box.innerHTML = parts.join('');
+      opts().forEach((o, i) => { o.id = `${box.id}-o${i}`; });   // 화면 읽기 프로그램이 ↑↓로 고른 항목을 읽도록
+      box.hidden = false; input.setAttribute('aria-expanded', 'true'); input.removeAttribute('aria-activedescendant'); sel = -1;
+      fit();
+    }
     function update() {
       const q = input.value.trim();
-      if (!q) return close();
-      const { sections, synonym } = idx.suggest(q, wide(700) ? 6 : 4);   // 폰: 자판이 화면 절반을 덮으므로 4개만
+      const big = wide(700);
+      if (!q) {   // 빈 칸을 누르면: 최근 검색 · 저장한 절 (이 기기에만 남는 기록)
+        const rq = rqGet().slice(0, big ? 6 : 4);
+        const sv = savedGet().slice(0, big ? 3 : 2).map((id) => idx.byId.get(id));
+        if (!rq.length && !sv.length) return close();
+        const parts = [];
+        if (rq.length) {
+          parts.push('<span class="grp" role="presentation">최근 검색</span>');
+          rq.forEach((x) => parts.push(`<div class="optrow" role="none"><a class="opt" role="option" href="#/search?q=${q2(x)}">${I.clock}<span>${esc(x)}</span></a><button type="button" class="rq-del" data-rq="${esc(x)}" tabindex="-1" aria-label="‘${esc(x)}’ 최근 검색에서 지우기">${I.x}</button></div>`));
+        }
+        if (sv.length) {
+          parts.push(`<span class="grp${rq.length ? ' sep' : ''}" role="presentation">저장한 절</span>`);
+          sv.forEach((s) => parts.push(`<a class="opt" role="option" href="#/s/${s.id}">${numTag(s.num)}<span>${esc(s.title)}</span><span class="where">제${s.vol}편</span></a>`));
+        }
+        return show(parts);
+      }
+      const nq = S.norm(q);
       const parts = [];
+      // 용어: 이름이 같거나 그 말로 시작하는 것 먼저 — 정의 첫머리를 바로 보여 준다(검색 버튼을 누르기 전에 답)
+      if (nq.length >= 2) {
+        const pre = GL.filter((g) => S.norm(g.t).startsWith(nq));
+        const inc = GL.filter((g) => !S.norm(g.t).startsWith(nq) && S.norm(g.t).includes(nq));
+        const th = [...pre.sort((a, b) => a.t.length - b.t.length), ...inc].slice(0, big ? 2 : 1);
+        if (th.length) {
+          parts.push('<span class="grp" role="presentation">용어</span>');
+          th.forEach((g) => { const d = (g.defs[0] && g.defs[0].d) || ''; parts.push(`<a class="opt tm" role="option" href="#/terms?t=${termSlug(g.t)}">${I.book}<span class="tt"><strong>${S.highlight(g.t, [q])}</strong><span class="dsc">${esc(d.length > 64 ? d.slice(0, 62) + '…' : d)}</span></span></a>`); });
+        }
+      }
+      const { sections, synonym } = idx.suggest(q, big ? 5 : 3);   // 폰: 자판이 화면 절반을 덮으므로 적게
       if (sections.length) {
         parts.push('<span class="grp" role="presentation">절 바로가기</span>');
         sections.forEach((s) => parts.push(`<a class="opt" role="option" href="#/s/${s.id}">${numTag(s.num)}<span>${S.highlight(s.title, [q])}</span><span class="where">제${s.vol}편${s.page ? ' · p.' + s.page : ''}</span></a>`));
+      }
+      // 시설: 시설 자료를 받아 둔 뒤에만(시설 종류 말을 치면 그때 받는다)
+      if (FAC_WORD.test(q) && !window.KRC_FAC) loadFac().then(() => { if (document.activeElement === input && input.value.trim() === q) update(); }, () => {});
+      const ff = q.length >= 2 ? facFind(q) : null;
+      if (ff) {
+        parts.push(`<span class="grp${parts.length ? ' sep' : ''}" role="presentation">시설</span>`);
+        ff.hits.slice(0, big ? 3 : 2).forEach((h) => parts.push(`<a class="opt" role="option" href="#/fac?${new URLSearchParams({ t: h.t.key, q: h.r[1], id: h.r[0] })}">${I.dam}<span><strong>${esc(h.r[1])}</strong> ${esc(facKind(h))}</span><span class="where">${esc([h.r[3], h.r[4]].join(' '))}</span></a>`));
       }
       parts.push(`<span class="grp${parts.length ? ' sep' : ''}" role="presentation">검색어</span>`);
       parts.push(`<a class="opt" role="option" href="#/search?q=${q2(synonym ? synonym.word : q)}">${I.search}<span>${esc(synonym ? synonym.word : q)}</span>${synonym ? `<span class="tag calc" style="margin-left:auto">동의어 ‘${esc(synonym.others.join('’, ‘'))}’도 함께 검색</span>` : ''}</a>`);
@@ -1669,11 +1720,18 @@
         parts.push(`<a class="opt" role="option" href="#/ask?q=${q2(q)}">${I.ask}<span>‘${esc(q)}’ 질문하기</span></a>`);
       }
       parts.push('<div class="hint" role="presentation"><span>절 번호를 입력하면 바로 이동합니다 (예: 4.5.6)</span><span class="kbd">↑↓ 이동 · Enter 선택 · Esc 닫기</span></div>');
-      box.innerHTML = parts.join('');
-      opts().forEach((o, i) => { o.id = `${box.id}-o${i}`; });   // 화면 읽기 프로그램이 ↑↓로 고른 항목을 읽도록
-      box.hidden = false; input.setAttribute('aria-expanded', 'true'); input.removeAttribute('aria-activedescendant'); sel = -1;
-      fit();
+      show(parts);
     }
+    // 목록을 누르는 동안 검색칸 초점을 지킨다(최근 검색 지우기 단추가 목록을 닫지 않게)
+    box.addEventListener('mousedown', (e) => { if (e.target.closest('.rq-del')) e.preventDefault(); });
+    box.addEventListener('click', (e) => {
+      const d = e.target.closest('.rq-del');
+      if (!d) return;
+      e.preventDefault(); e.stopPropagation();
+      rqDel(d.dataset.rq);
+      input.focus();
+      update();
+    });
     // 폰 자판이 올라오면 보이는 높이(visualViewport)가 줄어든다 → 목록이 자판 밑으로 숨지 않게 그 안에서 스크롤
     function fit() {
       if (box.hidden) return;
@@ -1683,7 +1741,7 @@
     }
     acFits.push(fit);
     input.addEventListener('input', update);
-    input.addEventListener('focus', () => { if (input.value.trim()) update(); });
+    input.addEventListener('focus', () => update());
     input.addEventListener('blur', () => setTimeout(close, 150));
     input.addEventListener('keydown', (e) => {
       if (box.hidden || e.isComposing || e.keyCode === 229) return;   // 한글 조합 중의 ↑↓·Enter는 글자 입력용
@@ -1714,6 +1772,14 @@
       const p = new URLSearchParams();
       [...new FormData(tf).entries()].forEach(([k, val]) => { if (String(val).trim()) p.set(k, String(val).trim()); });
       location.hash = `#/${tf.dataset.form}?${p}`;
+      return;
+    }
+    const fb = e.target.closest('form[data-form="findin"]');
+    if (fb) {   // 같은 절을 그 말로 다시 그린다(주소에 q — 앞뒤 이동·끄기는 기존 막대로). 기록은 바꾸기만(뒤로가 길어지지 않게)
+      e.preventDefault();
+      const v = fb.q.value.trim();
+      if (!v) { fb.q.focus(); return; }
+      location.replace(`#/s/${fb.dataset.id}?q=${q2(v)}`);
       return;
     }
     const form = e.target.closest('form[data-form="search"]');
@@ -1783,6 +1849,9 @@
     app.querySelectorAll('#tv tr').forEach((tr, i) => { tr.classList.toggle('hide', i > 0 && n && !S.norm(tr.textContent).includes(n)); });
     // 카드는 값만 비교(열 제목까지 보면 '평상시'처럼 제목 낱말로 찾을 때 모든 카드가 남는다)
     app.querySelectorAll('.tv-card .tcards > li').forEach((li) => { const vt = [...li.querySelectorAll('dd, .tc-h strong')].map((x) => x.textContent).join(' '); li.classList.toggle('hide', !!n && !S.norm(vt).includes(n)); });
+    // 맞는 줄 수를 알려 준다(없으면 빈 표만 남아 고장처럼 보이던 것)
+    const cnt = app.querySelector('.tv-count');
+    if (cnt) { const m = [...app.querySelectorAll('#tv tr')].filter((tr, i) => i > 0 && !tr.classList.contains('hide')).length; cnt.textContent = !n ? '' : m ? `‘${e.target.value.trim()}’ 들어간 줄 ${m}개` : `‘${e.target.value.trim()}’이(가) 들어간 줄이 없습니다`; }
   });
   app.addEventListener('click', (e) => {
     const openMenu = app.querySelector('.rmenu:not([hidden])');
@@ -1828,6 +1897,20 @@
       if (history.state && history.state.depth > 0) history.back(); else location.hash = '#/';
       return;
     }
+    if (act === 'find-in') {   // 이 절 안에서 찾기: 아래에 찾기 칸 → 찾은 말 강조·이동 막대(검색에서 들어올 때와 같은 것)
+      const id = parseHash().parts[1];
+      let bar = app.querySelector('.findbar');
+      if (!bar) {
+        bar = document.createElement('form');
+        bar.className = 'findbar'; bar.dataset.form = 'findin'; bar.dataset.id = id;
+        bar.setAttribute('role', 'search'); bar.setAttribute('aria-label', '이 절에서 찾기');
+        bar.innerHTML = `<label class="sr" for="findin-q">이 절에서 찾을 말</label><input id="findin-q" name="q" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" placeholder="이 절에서 찾을 말"><button type="submit" class="btn primary">찾기</button><button type="button" class="icon-btn" data-act="findbar-close" aria-label="찾기 닫기">${I.x}</button>`;
+        app.appendChild(bar);
+      }
+      bar.querySelector('input').focus();
+      return;
+    }
+    if (act === 'findbar-close') { const b = app.querySelector('.findbar'); if (b) b.remove(); const t = app.querySelector('.rhead [data-act="rmenu"], .tmore [data-act="rmenu"]'); if (t && t.offsetParent) t.focus(); return; }
     if (act === 'linkcopy') { copyText(location.href, '링크를 복사했습니다'); return; }
     if (act === 'fac-retry') { facLoading = null; render(location.hash); const b = app.querySelector('.facload'); if (b) { b.setAttribute('tabindex', '-1'); b.focus(); } return; }
     if (act === 'fac-more') {   // 펴 둔 카드(주소의 id)를 그대로 두고 다음 50곳
@@ -2014,6 +2097,15 @@
     const m = document.getElementById('main');
     if (m) { m.setAttribute('tabindex', '-1'); m.focus(); }
   });
+  // ⋯ 메뉴 안에서 ↑↓로 항목 이동(Home·End는 처음·끝)
+  app.addEventListener('keydown', (e) => {
+    const m = e.target.closest && e.target.closest('.rmenu');
+    if (!m || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    const items = [...m.querySelectorAll('button, a[href]')].filter((x) => x.offsetParent !== null);
+    const i = items.indexOf(document.activeElement);
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    if (items[j]) { e.preventDefault(); items[j].focus(); }
+  });
   document.addEventListener('keydown', (e) => {
     // 겹쳐 뜬 창(크게 보기, 폰의 원문 창) 안에서만 Tab이 돈다 — 뒤의 가려진 화면으로 초점이 빠지지 않게
     const dlg = detailEl() || app.querySelector('.sheet') || (document.documentElement.classList.contains('pdf-modal') ? paneEl() : null);
@@ -2028,6 +2120,7 @@
     }
     if (e.key === 'Escape' && sheetEl()) { e.preventDefault(); closeSheet(); dropLayer('sheet'); return; }
     if (e.key === 'Escape' && app.querySelector('.rmenu:not([hidden])')) { e.preventDefault(); closeMenu(true); return; }
+    if (e.key === 'Escape' && e.target.closest && e.target.closest('.findbar')) { e.preventDefault(); app.querySelector('.findbar').remove(); return; }
     if (detailEl()) {
       if (e.key === 'Escape') { e.preventDefault(); closeDetail(); dropLayer('detail'); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); detailGo(e.key === 'ArrowRight' ? 1 : -1); }
