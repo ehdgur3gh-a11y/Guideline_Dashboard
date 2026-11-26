@@ -558,10 +558,11 @@
     const saved = savedGet(), recent = recentGet();
     if (!saved.length && !recent.length) return '';
     const tab = saved.length && store.get('krc.mytab', 'saved') !== 'recent' ? 'saved' : 'recent';
-    const t = (key, label) => `<button type="button" role="tab" id="mt-${key}" aria-controls="mp-${key}" aria-selected="${tab === key}" data-act="mytab" data-tab="${key}">${label}</button>`;
-    const panel = (key, list, empty) => `<div role="tabpanel" id="mp-${key}" aria-labelledby="mt-${key}"${tab === key ? '' : ' hidden'}>${list.length ? `<ul>${list.slice(0, 6).map((id) => secLi(id)).join('')}</ul>` : `<p class="muted" style="margin:8px 4px">${empty}</p>`}</div>`;
+    // 두 갈래 고르기: 눌림 단추(aria-pressed) — 탭 역할을 흉내 내지 않는다(화살표 키 없는 탭 목록보다 정직)
+    const t = (key, label) => `<button type="button" id="mt-${key}" aria-controls="mp-${key}" aria-pressed="${tab === key}" data-act="mytab" data-tab="${key}">${label}</button>`;
+    const panel = (key, list, empty) => `<div class="mpanel" id="mp-${key}" aria-labelledby="mt-${key}"${tab === key ? '' : ' hidden'}>${list.length ? `<ul>${list.slice(0, 6).map((id) => secLi(id)).join('')}</ul>` : `<p class="muted" style="margin:8px 4px">${empty}</p>`}</div>`;
     return `<section class="recent mine" aria-label="내 절">
-        <div class="head"><div class="seg" role="tablist" aria-label="내 절">${t('saved', `★ 저장한 절 ${saved.length}`)}${t('recent', '최근 본 절')}</div><a class="linklike" href="#/saved">모두 보기</a></div>
+        <div class="head"><div class="seg" role="group" aria-label="내 절">${t('saved', `★ 저장한 절 ${saved.length}`)}${t('recent', '최근 본 절')}</div><a class="linklike" href="#/saved">모두 보기</a></div>
         ${panel('saved', saved, '본문의 ☆ 저장을 누르면 여기에 모입니다.')}${panel('recent', recent, '아직 본 절이 없습니다.')}
       </section>`;
   }
@@ -569,7 +570,7 @@
   function viewSaved() {
     document.title = '저장한 절 — 조사설계실무요령';
     const saved = savedGet(), recent = recentGet();
-    const rm = (id) => `<button type="button" class="icon-btn" data-act="unsave" data-id="${id}" aria-label="${esc(idx.byId.get(id).num)} 저장 지우기" title="저장 지우기">${I.x}</button>`;
+    const rm = (id) => { const s = idx.byId.get(id); return `<button type="button" class="icon-btn" data-act="unsave" data-id="${id}" aria-label="제${s.vol}편 ${esc([s.num, s.title].filter(Boolean).join(' '))} 저장 지우기" title="저장 지우기">${I.x}</button>`; };
     return topbar('', 'all', 'saved') + `<main id="main" class="page"><div class="main saved-page">
       <h1 style="margin:0;font-size:1.75rem">저장한 절</h1>
       <section class="recent mine">${saved.length ? `<ul>${saved.map((id) => secLi(id, rm(id))).join('')}</ul>` : '<p class="muted">아직 저장한 절이 없습니다. 본문 위의 ☆ 저장을 누르면 여기에 모입니다(이 기기에만 저장).</p>'}</section>
@@ -638,7 +639,8 @@
     const vTotal = Object.values(r.counts).reduce((a, b) => a + b, 0);
     const vchips = Object.keys(r.counts).length > 1 ? `<nav class="chips vchips" aria-label="편으로 좁히기"><a href="${vHref(0)}"${vols.size ? '' : ' aria-current="true"'}>전체 <span>${vTotal}</span></a>${D.vols.filter((v) => r.counts[v.id]).map((v) => `<a href="${vHref(v.id)}"${one === v.id ? ' aria-current="true"' : ''}>제${v.id}편 ${esc(v.name)} <span>${r.counts[v.id]}</span></a>`).join('')}</nav>` : '';
 
-    const defHit = scope === 'body' ? null : termFor(q, r.terms);   // 검색어가 용어면 맨 위에 정의
+    // 검색어 전체가 용어일 때만(낱말 하나일 때는 조사를 뗀 형태도) — '저수지 여유고'에서 '저수지' 정의가 뜨지 않게
+    const defHit = scope === 'body' ? null : termFor(q, r.terms.length === 1 ? r.terms : []);
     const numCards = numHits.slice(0, 4).map((s) => `<a class="titlehit" href="#/s/${s.id}"><span class="k">절 번호로 바로 가기</span><span class="t">${numTag(s.num)}<span class="tt">${esc(s.title)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
     const titleCards = r.titleHits.map((s) => `<a class="titlehit" href="#/s/${s.id}?q=${q2(q)}"><span class="k">절 제목 일치${s.title_raw && s.title_raw !== s.title ? ` — 원문 표기 ‘${esc(s.title_raw)}’` : ''}</span><span class="t">${numTag(s.num)}<span class="tt">${S.highlight(s.title, r.alts)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
     const items = shown.map((hit) => {
@@ -986,7 +988,7 @@
     const next = v.sections[s.order + 1];
     const path = idx.path(s);
     // 폰 머리줄: ← · 절 번호·제목 · 차례 · ⋯ (검색칸·목차·경로가 본문을 밀어내지 않게. 넓은 화면은 그대로)
-    const rhead = `<header class="rhead"><button type="button" class="icon-btn" data-act="back" aria-label="뒤로">${I.back}</button><span class="rt">${esc([s.num, s.title].filter(Boolean).join(' '))}</span><button type="button" class="rbtn" data-act="outline" aria-haspopup="dialog">${I.outline}차례</button><span class="rmenu-wrap"><button type="button" class="icon-btn" data-act="rmenu" aria-label="더 보기" aria-haspopup="menu" aria-expanded="false">${I.dots}</button><div class="rmenu" role="menu" aria-label="이 절" hidden><button type="button" role="menuitem" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>${canShare() ? `<button type="button" role="menuitem" data-act="linkcopy">${I.link}링크 복사</button>` : ''}<button type="button" role="menuitem" data-act="scale">${I.text}글자 크기</button><button type="button" role="menuitem" data-act="search-jump">${I.search}새 검색</button></div></span></header>`;
+    const rhead = `<header class="rhead"><button type="button" class="icon-btn" data-act="back" aria-label="뒤로">${I.back}</button><span class="rt">${esc([s.num, s.title].filter(Boolean).join(' '))}</span><button type="button" class="rbtn" data-act="outline" aria-haspopup="dialog">${I.outline}차례</button><span class="rmenu-wrap"><button type="button" class="icon-btn" data-act="rmenu" aria-label="더 보기" aria-controls="rmenu" aria-expanded="false">${I.dots}</button><div class="rmenu" id="rmenu" aria-label="이 절" hidden><button type="button" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>${canShare() ? `<button type="button" data-act="linkcopy">${I.link}링크 복사</button>` : ''}<button type="button" data-act="scale">${I.text}글자 크기</button><a href="#/saved">${I.bookmark}저장한 절</a><button type="button" data-act="search-jump">${I.search}새 검색</button></div></span></header>`;
     return topbar(q, 'all', 'toc', '', 'has-rhead') + rhead + `<main id="main" class="page">
       <nav class="toc" aria-label="목차"><details${wide(1100) ? ' open' : ''}>
         <summary>목차 — 제${v.id}편 ${esc(v.name)} · ${esc(curCh.num)} ${esc(curCh.title)}</summary>
@@ -1083,14 +1085,14 @@
       <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
         <span class="grab" aria-hidden="true"></span>
         <div class="sheet-head"><h2 id="sheet-t">${esc([s.num, s.title].filter(Boolean).join(' '))}</h2><button type="button" class="icon-btn" data-act="sheet-close" aria-label="차례 닫기">${I.x}</button></div>
-        <div class="seg" role="tablist" aria-label="차례 범위">
-          <button type="button" role="tab" id="st-in" aria-controls="sp-in" aria-selected="${tab === 'in'}" data-act="sheet-tab" data-tab="in"${items.length ? '' : ' disabled'}>이 절 안${items.length ? '' : ' (소제목 없음)'}</button>
-          <button type="button" role="tab" id="st-toc" aria-controls="sp-toc" aria-selected="${tab === 'toc'}" data-act="sheet-tab" data-tab="toc">목차 · 제${v.id}편</button>
+        <div class="seg" role="group" aria-label="차례 범위">
+          <button type="button" id="st-in" aria-controls="sp-in" aria-pressed="${tab === 'in'}" data-act="sheet-tab" data-tab="in"${items.length ? '' : ' disabled'}>이 절 안${items.length ? '' : ' (소제목 없음)'}</button>
+          <button type="button" id="st-toc" aria-controls="sp-toc" aria-pressed="${tab === 'toc'}" data-act="sheet-tab" data-tab="toc">목차 · 제${v.id}편</button>
         </div>
-        <div class="sheet-body" role="tabpanel" id="sp-in" aria-labelledby="st-in"${tab === 'in' ? '' : ' hidden'}>
+        <div class="sheet-body" id="sp-in" aria-labelledby="st-in"${tab === 'in' ? '' : ' hidden'}>
           <ol class="ol-in">${items.map((it, i) => `<li><a href="#" class="lv${it.lv}${it.kind ? ' k' : ''}" data-act="sheet-go" data-bi="${it.bi}"${i === ci ? ' aria-current="location"' : ''}>${icon(it.kind)}<span>${esc(it.label)}</span></a></li>`).join('')}</ol>
         </div>
-        <div class="sheet-body" role="tabpanel" id="sp-toc" aria-labelledby="st-toc"${tab === 'toc' ? '' : ' hidden'}>
+        <div class="sheet-body" id="sp-toc" aria-labelledby="st-toc"${tab === 'toc' ? '' : ' hidden'}>
           <label class="sr" for="volsel2">편 선택</label>
           <select id="volsel2" data-act="vol">${D.vols.map((x) => `<option value="${x.id}"${x.id === v.id ? ' selected' : ''}>제${x.id}편 ${esc(x.name)}</option>`).join('')}</select>
           <ul class="ol-toc">${tocList ? tocList.innerHTML : ''}</ul>
@@ -1123,14 +1125,19 @@
   function cardModel(b) {
     if (!b.cols || b.cols < 5 || tableIsFigure(b)) return null;
     const nRows = b.cells.reduce((m, c) => Math.max(m, c.r + (c.rs || 1)), 0);
+    // 머리 줄 수: 표 제목 줄(한 칸이 표 너비 전체) + 위 칸이 아래로 이어지거나(세로 병합) 묶음 제목(가로 병합)이 있는 줄까지 (최대 4줄)
     let hr = 1;
-    if (b.cells.some((c) => c.r === 0 && ((c.rs || 1) > 1 || (c.cs || 1) > 1))) hr = 2;
-    if (b.cells.some((c) => c.r >= 1 && c.r < hr && (c.rs || 1) > 1)) return null;
+    const titleRow = (r) => { const rc = b.cells.filter((c) => c.r === r); return rc.length === 1 && (rc[0].cs || 1) >= b.cols; };
+    while (hr < 4) {
+      const grows = b.cells.some((c) => c.r < hr && c.r + (c.rs || 1) > hr);
+      const group = b.cells.some((c) => c.r === hr - 1 && (c.cs || 1) > 1 && (c.cs || 1) < b.cols);
+      if (grows || group || titleRow(hr - 1)) hr++; else break;
+    }
     if (nRows - hr < 2) return null;
     const body = b.cells.filter((c) => c.r >= hr);
     if (body.some((c) => (c.cs || 1) > 1 || ((c.rs || 1) > 1 && c.c > 0))) return null;
     const head = Array.from({ length: b.cols }, () => []);
-    b.cells.filter((c) => c.r < hr).forEach((c) => {
+    b.cells.filter((c) => c.r < hr && !titleRow(c.r)).forEach((c) => {
       const t = tidyCell(S.plainText(c)).replace(/\s+/g, ' ').trim();
       for (let k = 0; k < (c.cs || 1); k++) if (t && !head[c.c + k].includes(t)) head[c.c + k].push(t);
     });
@@ -1213,7 +1220,8 @@
   const glByKey = new Map();
   GL.forEach((g) => {
     glByKey.set(S.norm(g.t), g);
-    if (g.alt && /[A-Za-z一-龥]/.test(g.alt) && g.alt.length <= 30) glByKey.set(S.norm(g.alt.replace(/\s*[:：].*$/, '')), g);
+    // 영문·한자 다른 이름도 찾는 말로 — 단 'k'·'H' 같은 한 글자 기호는 빼고(‘H’를 찾으면 평균파고가 뜨지 않게)
+    if (g.alt && /[A-Za-z一-龥]/.test(g.alt) && g.alt.length <= 30 && g.alt.replace(/[^A-Za-z一-龥]/g, '').length >= 2) glByKey.set(S.norm(g.alt.replace(/\s*[:：].*$/, '')), g);
   });
   /** 검색어가 용어 하나와 같으면 그 용어 (조사를 뗀 형태로도) */
   function termFor(q, terms) {
@@ -1290,29 +1298,40 @@
   function viewFac(params) {
     document.title = '시설정보 — 조사설계실무요령';
     if (!window.KRC_FAC) {
-      loadFac().then(() => { if (parseHash().parts[0] === 'fac') render(location.hash); }, () => toast('시설 자료를 불러오지 못했습니다'));
-      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main"><p class="boot" role="status">시설 자료를 불러오는 중…</p></div></main>${bottomnav('fac')}`;
+      const done = () => { if (parseHash().parts[0] !== 'fac') return; render(location.hash); const h = app.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } };
+      loadFac().then(done, () => {   // 받지 못하면(오프라인 등) 멈춰 있지 않고 알리고 다시 시도
+        const box = app.querySelector('.facload');
+        if (box) box.innerHTML = '<p>시설 자료를 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><button type="button" class="btn" data-act="fac-retry">다시 시도</button>';
+      });
+      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main"><h1 style="margin:0;font-size:1.75rem">시설정보</h1><div class="facload boot" role="status">시설 자료를 불러오는 중…</div></div></main>${bottomnav('fac')}`;
     }
     const F = window.KRC_FAC;
     const type = F.types.find((t) => t.key === params.get('t')) || F.types[0];
-    const sido = params.get('sido') || '';
-    const sgg = sido ? params.get('sgg') || '' : '';   // 시도 없이 남은 시군구는 무시
+    const sido0 = params.get('sido') || '';
+    const sidos = [...new Set(F.types.flatMap((t) => t.rows.map((r) => r[3])).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+    const sido = sidos.includes(sido0) ? sido0 : '';   // 목록에 없는 시도(옛 이름 등)는 무시 — 고르기 칸과 결과가 어긋나지 않게
+    const sggs = sido ? [...new Set(type.rows.filter((r) => r[3] === sido).map((r) => r[4]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')) : [];
+    const sgg = sggs.includes(params.get('sgg') || '') ? params.get('sgg') : '';   // 시도 없이, 또는 그 종류에 없는 시군구는 무시
     const q = (params.get('q') || '').trim();
     const open = params.get('id') || '';
+    const sub = type.key === '양배수장' ? params.get('sub') || '' : '';   // 양수장만·배수장만 (업무 흐름 '배수장 찾기')
     const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
     const nq = S.norm(q);
-    const sidos = [...new Set(F.types.flatMap((t) => t.rows.map((r) => r[3])).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
-    const sggs = sido ? [...new Set(type.rows.filter((r) => r[3] === sido).map((r) => r[4]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')) : [];
-    const rows = type.rows.filter((r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq)));
+    // (시도·시군구 목록은 위에서 만든다)
+    // 시설명·주소에 더해 시도·시군구 이름으로도 찾는다('광주'로 찾으면 통합 전 주소인 시설도)
+    const hit = (r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq) || S.norm(r[3] + r[4]).includes(nq));
+    const rows = type.rows.filter((r) => hit(r) && (!sub || r[7] === sub || r[7] === '양배수'));
     const per = 50, shown = rows.slice(0, page * per);
     const ki = type.cols.findIndex(([n]) => n === FAC_KEY_STAT[type.key]);
     const P = F.present;
-    const link = (o) => `#/fac?${new URLSearchParams(Object.assign({ t: type.key }, sido ? { sido } : {}, sgg ? { sgg } : {}, q ? { q } : {}, o))}`;
+    const link = (o) => `#/fac?${new URLSearchParams(Object.assign({ t: type.key }, sido ? { sido } : {}, sgg ? { sgg } : {}, q ? { q } : {}, sub ? { sub } : {}, o))}`;
     const guideOf = (r) => (F.guide[type.key === '양배수장' ? (r[7] === '배수' ? '배수' : '양수') : type.key] || []).concat(type.key === '양배수장' && r[7] === '양배수' ? F.guide['배수'] : []);
     const BIZ_OF = { 저수지: 0, 양배수장: 0, 취입보: 0, 방조제: 3 };
+    const bizOf = (r) => (type.key === '양배수장' && r[7] === '배수' ? 1 : BIZ_OF[type.key]);   // 배수장은 배수개선 흐름으로
     const card = (r) => {
       const stat = ki >= 0 && r[10][ki] != null ? `${fmtNum(r[10][ki])} ${type.cols[ki][1]}` : '';
-      const specs = type.cols.map(([n, u], i) => (r[10][i] == null || r[10][i] === 0 || r[10][i] === '' ? '' : `<div><dt>${esc(n)}</dt><dd>${fmtNum(r[10][i])}${u ? ` <small>${esc(u)}</small>` : ''}</dd></div>`)).join('');
+      const warn = new Set(r[11] || []);
+      const specs = type.cols.map(([n, u], i) => (r[10][i] == null || r[10][i] === 0 || r[10][i] === '' ? '' : `<div${warn.has(i) ? ' class="warn"' : ''}><dt>${esc(n)}</dt><dd>${fmtNum(r[10][i])}${u ? ` <small>${esc(u)}</small>` : ''}${warn.has(i) ? ' <small class="wn">원자료 값 — 확인 필요</small>' : ''}</dd></div>`)).join('');
       const g = guideOf(r);
       return `<li><details${open === r[0] ? ' open' : ''}><summary>
           <span class="fh"><strong>${esc(r[1])}</strong><span class="muted">${esc(type.label)}${r[7] ? `(${esc(r[7])})` : ''} · ${esc(r[6] || '')}</span>${stat ? `<span class="st">${stat}</span>` : ''}</span>
@@ -1321,7 +1340,7 @@
         <div class="fbody">
           ${specs ? `<dl class="spec">${specs}</dl>` : ''}
           ${r[8] || r[9] ? `<p class="muted" style="margin:0;font-size:.9375rem">관리: ${r[8] ? esc(r[8]) + '지사' : ''}${r[9] ? ` · <a href="tel:${esc(r[9].replace(/[^\d]/g, ''))}">${esc(r[9])}</a>` : ''}</p>` : ''}
-          <div class="facts">${g.map(([id, label]) => `<a class="btn outline" href="#/s/${id}">설계 기준: ${esc(label)}</a>`).join('')}${BIZ_OF[type.key] != null ? `<a class="btn" href="#/flow?b=${BIZ_OF[type.key]}">업무 흐름에서 보기</a>` : ''}<a class="btn" href="https://rawris.ekr.or.kr/selectFacList.do" target="_blank" rel="noopener" title="RAWRIS 시설 검색에서 시설명으로 찾아보세요">RAWRIS ↗</a></div>
+          <div class="facts">${g.map(([id, label]) => `<a class="btn outline" href="#/s/${id}">설계 기준: ${esc(label)}</a>`).join('')}${bizOf(r) != null ? `<a class="btn" href="#/flow?b=${bizOf(r)}">업무 흐름에서 보기</a>` : ''}<a class="btn" href="https://rawris.ekr.or.kr/selectFacList.do" target="_blank" rel="noopener" title="RAWRIS 시설 검색에서 시설명으로 찾아보세요">RAWRIS ↗</a></div>
           <p class="muted" style="margin:0;font-size:.875rem">표준코드 ${esc(r[0])} · 자료 기준 ${esc(F.dates[type.key] || '')}</p>
         </div></details></li>`;
     };
@@ -1329,14 +1348,15 @@
       <div class="pagehead"><h1>시설정보</h1><span class="muted">농업생산기반시설 · 공사 관리 ${F.types.reduce((n, t) => n + t.rows.length, 0).toLocaleString('ko-KR')}곳</span></div>
       <nav class="chips present" aria-label="전국 현황 (통계연보 2024)"><span class="tot">전국 <strong>${P.total[0].toLocaleString('ko-KR')}</strong></span>${P.rows.map(([n, all, krc]) => `<span>${esc(n)} <strong>${all.toLocaleString('ko-KR')}</strong><small>공사 ${krc.toLocaleString('ko-KR')}</small></span>`).join('')}</nav>
       <form class="facform" data-form="fac" role="search" aria-label="시설 찾기">
-        <input type="hidden" name="t" value="${esc(type.key)}">
+        <input type="hidden" name="t" value="${esc(type.key)}">${sub ? `<input type="hidden" name="sub" value="${esc(sub)}">` : ''}
         <label class="btn tv-find">${I.search}<span class="sr">시설명 또는 소재지</span><input name="q" type="search" value="${esc(q)}" placeholder="시설명·소재지 (예: 용천, 기장군)" spellcheck="false" autocomplete="off" enterkeyhint="search"></label>
         <div class="sel2">
           <label><span class="sr">시도</span><select name="sido" data-act="fac-sido"><option value="">시도 전체</option>${sidos.map((x) => `<option${x === sido ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
           <label><span class="sr">시군구</span><select name="sgg" data-act="fac-sgg"${sido ? '' : ' disabled'}><option value="">시군구 전체</option>${sggs.map((x) => `<option${x === sgg ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
         </div>
       </form>
-      <nav class="chips" aria-label="시설 구분">${F.types.map((t) => `<a href="${link({ t: t.key })}"${t === type ? ' aria-current="true"' : ''}>${esc(t.label)} <span>${(sido || sgg || q ? t.rows.filter((r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq))).length : t.rows.length).toLocaleString('ko-KR')}</span></a>`).join('')}</nav>
+      <nav class="chips" aria-label="시설 구분">${F.types.map((t) => `<a href="${link({ t: t.key })}"${t === type ? ' aria-current="true"' : ''}>${esc(t.label)} <span>${(sido || sgg || q ? t.rows.filter(hit).length : t.rows.length).toLocaleString('ko-KR')}</span></a>`).join('')}</nav>
+      ${type.key === '양배수장' ? `<nav class="chips" aria-label="양수·배수">${[['', '전체'], ['양수', '양수장'], ['배수', '배수장']].map(([k, l]) => `<a href="${link({ sub: k })}"${sub === k ? ' aria-current="true"' : ''}>${l}</a>`).join('')}</nav>` : ''}
       <p class="muted" style="margin:0">${esc([sido, sgg].filter(Boolean).join(' ') || '전국')} ${esc(type.label)} <strong style="color:var(--ink)">${rows.length.toLocaleString('ko-KR')}곳</strong>${q ? ` · ‘${esc(q)}’` : ''}</p>
       ${rows.length ? `<ol class="faclist">${shown.map(card).join('')}</ol>${rows.length > shown.length ? `<a class="btn" style="align-self:center" href="${link({ page: page + 1 })}">더 보기 (${(rows.length - shown.length).toLocaleString('ko-KR')}곳 남음)</a>` : ''}` : '<p class="empty card">해당하는 시설이 없습니다. 시군 관리 시설은 RAWRIS에서 찾아보세요.</p>'}
       <p class="muted" style="font-size:.875rem;margin:0">자료: ${esc(F.source)} — 공사가 관리하는 시설만 들어 있습니다(시군 관리 ${P.total[2].toLocaleString('ko-KR')}곳은 <a href="https://rawris.ekr.or.kr/selectFacList.do" target="_blank" rel="noopener">RAWRIS 시설 검색 ↗</a>). 현황: ${esc(P.source)}.</p>
@@ -1347,21 +1367,24 @@
   const BIZ = [1, 2, 3, 4];
   function flowSteps(vol) {
     const chs = D.vols.find((v) => v.id === vol).sections.filter((s) => s.level === 1 && typeof s.chapter === 'number');
-    const s1 = [], s2 = [], s3 = [];
+    const s1 = [], s2 = [], s3 = [], also1 = [];
     chs.forEach((c) => {
       if (/개요/.test(c.title)) return;
       if (/예정지/.test(c.title)) s1.push(c);
       else if (/조사측량|현장조사/.test(c.title)) s2.push(c);
+      else if (/관련법/.test(c.title)) also1.push(c);   // 문화재·사전환경성 협의는 설계가 아니라 초기 인허가 일 → 1단계에 함께
       else s3.push(c);
     });
-    const pick = (v, re) => D.vols.find((x) => x.id === v).sections.filter((s) => s.level === 1 && typeof s.chapter === 'number' && re.test(s.title));
+    const chOf = (v, nums) => nums.map((n) => idx.byId.get(`${v}-ch${n}`)).filter(Boolean);
+    // 수문 검토는 사업마다 다르다: 용수는 유출·필요수량·물수지, 배수개선은 홍수, 간척은 조석·담수호까지
+    const HYD = { 1: [3, 4, 5, 6, 7, 8], 2: [3, 7, 8], 3: [3, 5, 7], 4: [3, 7, 8, 9, 10] };
     return [
-      { n: 1, title: '예정지 조사', items: s1, own: true },
+      { n: 1, title: '예정지 조사', items: s1, also: also1, own: true },
       { n: 2, title: '조사측량·현장조사', items: s2, own: true },
       { n: 3, title: '계획·시설 설계', items: s3, own: true },
-      { n: 4, title: '수문 검토', items: pick(5, /필요수량|물수지|홍수/), src: '제5편 수문' },
-      { n: 5, title: '적산', items: pick(6, /단가|원가/), src: '제6편 품셈' },
-      { n: 6, title: '설계서 작성', items: pick(7, /./), src: '제7편 부록' },
+      { n: 4, title: '수문 검토', items: chOf(5, HYD[vol] || [3, 5, 6, 7, 8]), src: '제5편 수문' },
+      { n: 5, title: '적산', items: chOf(6, [2, 3, 4, 5]), src: '제6편 품셈' },
+      { n: 6, title: '설계서 작성', items: chOf(7, [1, 2, 3]), src: '제7편 부록' },
     ];
   }
   function viewFlow(params) {
@@ -1370,20 +1393,40 @@
     const v = D.vols.find((x) => x.id === vol);
     document.title = '업무 흐름 — 조사설계실무요령';
     const steps = flowSteps(vol);
-    const openStep = parseInt(params.get('st'), 10) || 0;
+    // 펼친 단계: 주소의 st=1,3 (펴고 접을 때 주소에 적어 둔다 — 뒤로 오면 그대로 펼쳐져 위치가 맞다)
+    const openSet = params.has('st') ? new Set((params.get('st') || '').split(',').map(Number).filter(Boolean)) : null;
     // 단계마다: 할 일(장의 절 차례) · 흐름도 · 산출물 · 관련 용어 · 관련 시설
     const secsOf = (ch) => { const vv = volOf(ch); const out = []; for (let i = ch.order + 1; i < vv.sections.length && vv.sections[i].level > 1; i++) out.push(vv.sections[i]); return out; };
-    const FAC_OF = { 1: [['저수지', '저수지'], ['양배수장', '양수장'], ['취입보', '취입보']], 2: [['양배수장', '배수장']], 4: [['방조제', '방조제']] };
+    // 흐름도: 절 제목('흐름도') + 본문 그림·표 제목('[그림 4.1.1] 침수분석 흐름도') — 제2~4편은 그림 제목에만 있다
+    const flowCharts = (secs) => {
+      const out = [], seen = new Set();
+      secs.forEach((x) => {
+        if (/흐름도|체계도/.test(x.title)) { out.push({ id: x.id, label: `${x.num} ${x.title}` }); seen.add(x.id); }
+        if (!seen.has(x.id)) x.blocks.forEach((b) => {   // 제목이 흐름도인 절은 그 안의 같은 그림을 또 싣지 않는다
+          const cap = (b.t === 'p' ? b.text : b.t === 'table' ? b.caption || '' : '').trim();
+          if (/^\[그림[^\]]*\]/.test(cap) && /흐름도|체계도|흐름$/.test(cap) && cap.length < 70 && !seen.has(x.id + cap)) { out.push({ id: x.id, label: cap.replace(/^\[그림\s*/, '[').replace(/\s+/g, ' ') }); seen.add(x.id + cap); }
+        });
+      });
+      return out;
+    };
+    const intro = v.sections.filter((x) => typeof x.chapter === 'number' && x.chapter === 1);
+    const overall = flowCharts(intro).slice(0, 3);
+    const FAC_OF = { 1: [['저수지', '저수지'], ['양배수장', '양수장', '양수'], ['취입보', '취입보']], 2: [['양배수장', '배수장', '배수']], 4: [['방조제', '방조제']] };
     const stepHtml = (st) => {
       const chs = st.items;
       const kids = chs.flatMap(secsOf);
       const todo = chs.length === 1 ? kids.filter((x) => x.level === 2) : [];
-      const flows = kids.filter((x) => /흐름도|체계도/.test(x.title)).slice(0, 6);
-      const report = st.own ? kids.filter((x) => x.level === 2 && /보고서/.test(x.title)).slice(-1)[0] : null;
+      const flows = flowCharts([...chs, ...kids]).slice(0, 6);
+      // 산출물: 보고서·측량성과·결과 정리·제출 절 (마지막 것)
+      const report = st.own ? kids.filter((x) => x.level === 2 && /보고서|성과|결과\s*정리|제출/.test(x.title)).slice(-1)[0] : null;
+      let outName = report ? (/보고서/.test(report.title) ? report.title.replace(/(보고서).*$/, '$1') : report.title.replace(/\s*(작성|정리|제출)$/, '')) : '';
       const ids = new Set(chs.flatMap((c) => [c.id, ...secsOf(c).map((x) => x.id)]));
-      const terms = GL.filter((g) => g.defs.some((d) => ids.has(d.id))).slice(0, 8);
+      if (report && outName.length < 5) outName = report.title;   // '보고서'만 남으면 절 제목 그대로
+      // 관련 용어: 용어·정의 절에서 온 것을 먼저(가나다 순서대로 앞 8개만 고르면 수식 기호 같은 덜 중요한 말이 앞선다)
+      const fromGloss = (g) => (g.defs.some((d) => { const s = idx.byId.get(d.id); return s && /용어|정의/.test(s.title); }) ? 0 : 1);
+      const terms = GL.filter((g) => g.defs.some((d) => ids.has(d.id))).sort((a, b) => fromGloss(a) - fromGloss(b)).slice(0, 8);
       const facs = st.n === 1 || st.n === 3 ? FAC_OF[vol] || [] : [];
-      const open = openStep ? openStep === st.n : (st.n === 1 || wide(1100));
+      const open = openSet ? openSet.has(st.n) : (st.n === 1 || wide(1100));
       const list = todo.length
         ? `<p class="lead">이 단계에서 할 일 (차례대로)</p><ol class="todo">${todo.map((x) => `<li><a href="#/s/${x.id}"><span class="n">${esc(x.num)}</span><span class="t">${esc(x.title)}</span>${x.page ? `<span class="muted">p.${x.page}</span>` : ''}</a></li>`).join('')}</ol>`
         : `<p class="lead">${st.n === 3 ? '설계할 시설을 고르세요' : '볼 장'}</p><ol class="todo">${chs.map((c) => `<li><a href="#/s/${c.id}"><span class="n">${esc(c.num)}</span><span class="t">${esc(c.title)}</span>${c.page ? `<span class="muted">p.${c.page}</span>` : ''}</a></li>`).join('') || '<li class="muted">—</li>'}</ol>`;
@@ -1391,10 +1434,11 @@
         <summary><span class="dot">${st.n}</span><span class="h"><strong>${st.title}</strong><span class="muted">${st.own ? `제${vol}편 ${esc(v.name)}${chs[0] ? ` · ${esc(chs.map((c) => c.num).join('·'))}` : ''}` : st.src + ' (모든 사업 공통)'}</span></span><span class="muted cnt">${todo.length ? `할 일 ${todo.length}` : `장 ${chs.length}`}</span></summary>
         <div class="sbody">
           ${list}
-          ${flows.length ? `<p class="row"><span class="muted">흐름도</span>${flows.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.num)} ${esc(f.title)}</a>`).join('')}</p>` : ''}
-          ${report ? `<p class="row"><span class="muted">산출물</span><a class="out" href="#/s/${report.id}">${esc(report.title.replace(/\s*작성$/, ''))}</a></p>` : ''}
+          ${flows.length ? `<p class="row"><span class="muted">흐름도</span>${flows.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
+          ${st.also && st.also.length ? `<p class="row"><span class="muted">함께 볼 장</span>${st.also.map((c) => `<a class="tchip" href="#/s/${c.id}">${esc(c.num)} ${esc(c.title)}</a>`).join('')}</p>` : ''}
+          ${report ? `<p class="row"><span class="muted">산출물</span><a class="out" href="#/s/${report.id}">${esc(outName)}</a></p>` : ''}
           ${terms.length ? `<p class="row"><span class="muted">용어</span>${terms.map((g) => `<a class="tchip" href="#/terms?t=${termSlug(g.t)}">${esc(g.t)}</a>`).join('')}</p>` : ''}
-          ${facs.length ? `<p class="row"><span class="muted">시설정보</span>${facs.map(([k, label]) => `<a class="tchip fac" href="#/fac?t=${encodeURIComponent(k)}">${esc(label)} 찾기 →</a>`).join('')}</p>` : ''}
+          ${facs.length ? `<p class="row"><span class="muted">시설정보</span>${facs.map(([k, label, sb]) => `<a class="tchip fac" href="#/fac?t=${encodeURIComponent(k)}${sb ? '&sub=' + encodeURIComponent(sb) : ''}">${esc(label)} 찾기 →</a>`).join('')}</p>` : ''}
         </div></details></li>`;
     };
     const matrix = BIZ.map((vid) => {
@@ -1406,6 +1450,7 @@
     return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main flow-page">
       <div class="pagehead"><h1>업무 흐름</h1><span class="muted">예정지 조사부터 설계서 작성까지 6단계</span></div>
       <div class="biz" role="group" aria-label="사업 유형">${BIZ.map((vid, i) => `<button type="button" aria-pressed="${i === bi}" data-act="biz" data-b="${i}">${esc(D.vols.find((x) => x.id === vid).name)}</button>`).join('')}</div>
+      ${overall.length ? `<p class="row overall"><span class="muted">사업 전체 흐름도</span>${overall.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
       <ol class="stepper">${steps.map(stepHtml).join('')}</ol>
       <p class="muted" style="margin:0;font-size:.9375rem">1~3단계는 사업별 편, 4~6단계는 모든 사업이 함께 쓰는 공통 편입니다. 단계를 누르면 펼쳐집니다.</p>
       <section class="matrix"><h2 style="font-size:1.1875rem">한눈에 — 사업 × 단계</h2>
@@ -1425,7 +1470,7 @@
   let entrySeq = Date.now();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   let lastSearchKey = null;
-  let appNavs = -1;   // 이 사이트 안에서 화면을 옮긴 횟수 — 폰 머리줄 '←'가 사이트 밖으로 나가지 않게
+  let curDepth = 0;   // 이 사이트 안에서 몇 번째 화면인지(기록마다 저장) — 폰 머리줄 '←'가 사이트 밖으로 나가지 않게
   let focusAfter = null;   // 다시 그린 뒤 초점을 둘 곳(편 고르기·사업 단추)
   function render(hash) {
     const { parts, params } = parseHash(typeof hash === 'string' ? hash : undefined);
@@ -1450,20 +1495,22 @@
     if (typeof hash !== 'string') {
       if (curEntry != null) scrollMemo.set(curEntry, window.scrollY);
       const st = history.state;
-      if (st && st.krc != null) { back = scrollMemo.has(st.krc); restoreTo = scrollMemo.get(st.krc) || 0; curEntry = st.krc; }
-      else { curEntry = ++entrySeq; try { history.replaceState({ krc: curEntry }, ''); } catch (e) { /* 무시 */ } }
+      if (st && st.krc != null) { back = scrollMemo.has(st.krc); restoreTo = scrollMemo.get(st.krc) || 0; curEntry = st.krc; curDepth = st.depth || 0; }
+      else { curEntry = ++entrySeq; curDepth = rendered ? curDepth + 1 : 0; try { history.replaceState({ krc: curEntry, depth: curDepth }, ''); } catch (e) { /* 무시 */ } }
     }
     document.documentElement.classList.remove('pdf-modal', 'pdf-detail', 'sheet-open', 'has-hitbar');
-    if (typeof hash !== 'string') appNavs++;
+    // (화면 깊이는 기록마다 curDepth로 적는다)
     if (typeof hash !== 'string' && !(history.state && history.state.layer)) layers.length = 0;   // 앞 화면의 원문 창(폰 전체 화면)·크게 보기는 닫힌다
     // 같은 검색어에서 편 필터·'결과 더 보기'만 바뀐 경우: 맨 위로 튀지 않고, 펴 둔 필터와 초점을 그대로
-    const searchKey = parts[0] === 'search' ? `${params.get('q') || ''}|${params.get('scope') || 'all'}` : null;
+    // 시설정보도 같은 조건에서 '더 보기'만 바뀌면 위치·초점 유지
+    const searchKey = parts[0] === 'search' ? `${params.get('q') || ''}|${params.get('scope') || 'all'}`
+      : parts[0] === 'fac' ? `fac|${['t', 'sido', 'sgg', 'q', 'sub'].map((k) => params.get(k) || '').join('|')}` : null;
     const same = searchKey != null && searchKey === lastSearchKey && typeof hash !== 'string' && !back;
     const keep = same ? {
       y: window.scrollY,
       filt: !!app.querySelector('.filters details[open]'),
       vol: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.vol : null,
-      count: app.querySelectorAll('ol.results > li').length,
+      count: app.querySelectorAll('ol.results > li, .faclist > li').length,
     } : null;
     lastSearchKey = searchKey;
     app.innerHTML = html;
@@ -1473,9 +1520,10 @@
     app.querySelectorAll('form[data-form="search"]').forEach(attachAutocomplete);
     // 화면이 바뀌면 화면 읽기 프로그램이 새 제목부터 읽도록 초점을 h1로 (첫 화면·시험 호출 제외)
     if (rendered && typeof hash !== 'string') {
-      const after = focusAfter && app.querySelector(focusAfter);
+      let after = focusAfter && app.querySelector(focusAfter);
+      if (after && after.offsetParent === null) after = null;   // 숨은 칸(폰의 목차 등)이면 제목으로
       focusAfter = null;
-      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a`));
+      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a, .faclist > li:nth-child(${keep.count + 1}) summary`));
       const h1 = app.querySelector('h1');
       if (next) next.focus({ preventScroll: true });
       else if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
@@ -1635,15 +1683,42 @@
       focusAfter = `[data-act="${t.dataset.act}"]`;
       f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     } else if (t.matches('[data-act="vol"]')) {
+      const href = `#/s/${t.value}-ch1`;
+      if (t.closest('.sheet')) {   // 차례 시트 안에서 고르면: 시트 기록을 거둔 뒤 이동(죽은 '뒤로' 기록이 남지 않게)
+        closeSheet(true);
+        if (layers[layers.length - 1] === 'sheet') { afterPop = () => { location.hash = href; }; dropLayer('sheet'); } else location.hash = href;
+        return;
+      }
       focusAfter = '#volsel';   // 키보드 ↑↓로 편을 넘길 때 초점이 제목으로 튀지 않게
-      location.hash = `#/s/${t.value}-ch1`;
+      location.hash = href;
     }
+  });
+  // 펴고 접은 상태를 주소에 적어 둔다(업무 흐름 st=, 시설정보 id=) — 뒤로 돌아오면 그대로 펼쳐져 위치가 맞다
+  app.addEventListener('toggle', (e) => {
+    const d = e.target;
+    const { parts, params } = parseHash();
+    let changed = false;
+    if (parts[0] === 'flow' && d.closest && d.closest('.stepper')) {
+      params.set('st', [...app.querySelectorAll('.stepper > li')].map((li, i) => (li.querySelector('details').open ? i + 1 : 0)).filter(Boolean).join(','));
+      changed = true;
+    } else if (parts[0] === 'fac' && d.closest && d.closest('.faclist')) {
+      const code = d.querySelector('.fbody .muted:last-child')?.textContent.match(/표준코드 (\S+)/);
+      if (d.open && code) params.set('id', code[1]); else if (!d.open) params.delete('id');
+      changed = true;
+    }
+    if (changed) { try { history.replaceState(history.state, '', `#/${parts.join('/')}?${params}`); } catch (err) { /* 무시 */ } }
+  }, true);
+  // ⋯ 메뉴: 초점이 메뉴 밖으로 나가면 닫는다(Tab으로 빠져나갈 때)
+  app.addEventListener('focusout', (e) => {
+    const w = e.target.closest && e.target.closest('.rmenu-wrap');
+    if (w && !w.contains(e.relatedTarget)) { const m = w.querySelector('.rmenu'); if (m && !m.hidden) closeMenu(); }
   });
   app.addEventListener('input', (e) => {
     if (!e.target.matches('[data-act="tfilter"]')) return;
     const n = S.norm(e.target.value);
     app.querySelectorAll('#tv tr').forEach((tr, i) => { tr.classList.toggle('hide', i > 0 && n && !S.norm(tr.textContent).includes(n)); });
-    app.querySelectorAll('.tv-card .tcards > li').forEach((li) => { li.classList.toggle('hide', !!n && !S.norm(li.textContent).includes(n)); });
+    // 카드는 값만 비교(열 제목까지 보면 '평상시'처럼 제목 낱말로 찾을 때 모든 카드가 남는다)
+    app.querySelectorAll('.tv-card .tcards > li').forEach((li) => { const vt = [...li.querySelectorAll('dd, .tc-h strong')].map((x) => x.textContent).join(' '); li.classList.toggle('hide', !!n && !S.norm(vt).includes(n)); });
   });
   app.addEventListener('click', (e) => {
     const openMenu = app.querySelector('.rmenu:not([hidden])');
@@ -1651,7 +1726,7 @@
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const act = el.dataset.act;
-    if (el.closest('.rmenu') && act !== 'rmenu') closeMenu();
+    if (el.closest('.rmenu') && act !== 'rmenu') closeMenu(true);   // 고른 뒤 초점은 ⋯ 단추로
     if (act === 'toc-jump' && !wide(700) && parseHash().parts[0] === 's' && idx.byId.get(parseHash().parts[1])) {
       e.preventDefault(); openSheet('toc'); return;   // 폰 본문: 하단 '목차'는 이 편 목차 시트
     }
@@ -1659,8 +1734,8 @@
     if (act === 'sheet-close') { closeSheet(); dropLayer('sheet'); return; }
     if (act === 'sheet-tab') {
       const key = el.dataset.tab, sh = sheetEl();
-      sh.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t === el)));
-      sh.querySelectorAll('[role="tabpanel"]').forEach((pn) => { pn.hidden = pn.id !== `sp-${key}`; });
+      sh.querySelectorAll('[data-act="sheet-tab"]').forEach((t) => t.setAttribute('aria-pressed', String(t === el)));
+      sh.querySelectorAll('.sheet-body').forEach((pn) => { pn.hidden = pn.id !== `sp-${key}`; });
       focusSheet(key);
       return;
     }
@@ -1682,14 +1757,15 @@
       const m = el.parentElement.querySelector('.rmenu');
       const open = m.hidden;
       m.hidden = !open; el.setAttribute('aria-expanded', String(open));
-      if (open) m.querySelector('[role="menuitem"]').focus();
+      if (open) m.querySelector('button, a').focus();
       return;
     }
     if (act === 'back') {
-      if (appNavs > 0) history.back(); else location.hash = '#/';
+      if (history.state && history.state.depth > 0) history.back(); else location.hash = '#/';
       return;
     }
     if (act === 'linkcopy') { copyText(location.href, '링크를 복사했습니다'); return; }
+    if (act === 'fac-retry') { facLoading = null; render(location.hash); return; }
     if (act === 'hit-off') {   // 찾은 말 강조와 이동 막대를 걷는다(주소에서도 검색어를 뺀다)
       app.querySelectorAll('.content mark').forEach((m) => m.replaceWith(document.createTextNode(m.textContent)));
       const nav = app.querySelector('.hitnav'); if (nav) nav.remove();
@@ -1703,6 +1779,8 @@
       app.querySelectorAll('.cardable').forEach((f) => f.classList.toggle('as-grid', next === 'grid'));
       app.querySelectorAll('[data-act="tview"]').forEach((b) => { b.textContent = next === 'card' ? '표로 보기' : '카드로 보기'; });
       markWide();
+      const tot = app.querySelector('[data-hittotal]');   // 찾은 말 수는 보이는 쪽(카드/표) 기준으로 다시
+      if (tot) { const n = visMarks().length; tot.textContent = n; hitIdx = Math.min(hitIdx, Math.max(0, n - 1)); }
       return;
     }
     if (act === 'toc-jump') {
@@ -1756,16 +1834,21 @@
         b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
         b.innerHTML = `${on ? I.starOn : I.star}<span>${on ? '저장됨' : '저장'}</span>`;
       });
-      toast(on ? '저장했습니다 — 하단 ‘저장’에서 다시 열 수 있습니다' : '저장을 지웠습니다');
+      toast(on ? '저장했습니다 — 홈의 ‘저장한 절’에서 다시 열 수 있습니다' : '저장을 지웠습니다');
       return;
     }
     if (act === 'unsave') {
       savedToggle(el.dataset.id);
       const li = el.closest('li');
       const next = li && (li.nextElementSibling || li.previousElementSibling);
+      const list = li && li.parentElement;
       if (li) li.remove();
       const f = next && next.querySelector('[data-act="unsave"]');
       if (f) f.focus();
+      else if (list && !list.children.length) {   // 마지막 하나를 지우면 안내 문구로, 초점은 제목으로
+        list.outerHTML = '<p class="muted">저장한 절이 없습니다. 본문 위의 ☆ 저장을 누르면 여기에 모입니다(이 기기에만 저장).</p>';
+        const h = app.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
+      }
       toast('저장을 지웠습니다');
       return;
     }
@@ -1773,8 +1856,8 @@
       const key = el.dataset.tab;
       store.set('krc.mytab', key);
       const box = el.closest('.mine');
-      box.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t === el)));
-      box.querySelectorAll('[role="tabpanel"]').forEach((pn) => { pn.hidden = pn.id !== `mp-${key}`; });
+      box.querySelectorAll('[data-act="mytab"]').forEach((t) => t.setAttribute('aria-pressed', String(t === el)));
+      box.querySelectorAll('.mpanel').forEach((pn) => { pn.hidden = pn.id !== `mp-${key}`; });
       return;
     }
     if (act === 'search-jump') {
