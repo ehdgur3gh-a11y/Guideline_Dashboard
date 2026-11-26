@@ -129,7 +129,7 @@
       if (STOP.has(tok) || STOP.has(stripped)) continue;
       const variants = [...new Set([tok, stripped])].filter((v) => v.length >= 1);
       // 'cn값'처럼 영문과 한글이 붙어 있으면 영문 부분도 후보로
-      const latin = /^([a-z][a-z0-9/-]*)[가-힣]+$/.exec(stripped);
+      const latin = /^([a-z][a-z0-9/-]+)[가-힣]+$/.exec(stripped);   // 두 글자 이상만('cn값'→cn). 'n치'·'t값'의 n·t 한 글자는 본문 곳곳에 걸린다
       if (latin) variants.push(latin[1]);
       const key = variants.join('|');
       if (seen.has(key)) continue;

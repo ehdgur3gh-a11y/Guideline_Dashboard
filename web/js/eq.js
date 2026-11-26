@@ -174,6 +174,7 @@
 
     function seq(stop) {
       const parts = [];
+      const lines = [];   // 맨 바깥의 '#'(줄바꿈)으로 나뉜 줄 — 여러 줄 계산식이 한 줄로 뭉치지 않게
       while (p < toks.length && toks[p].k !== stop) {
         const t = toks[p];
         if (t.k === '}' && stop !== '}') { p++; continue; }
@@ -184,8 +185,13 @@
           parts.push(`<span class="eq-frac"><span class="eq-num">${num}</span><span class="eq-den">${den}</span></span>`);
           continue;
         }
+        if (t.k === '#' && stop === null) { p++; lines.push(parts.splice(0).join('')); continue; }
         if (t.k === '#' || t.k === '&') { p++; parts.push(' '); continue; }
         parts.push(atomWithScripts());
+      }
+      if (lines.length) {
+        lines.push(parts.join(''));
+        return `<span class="eq-lines">${lines.filter((l) => l.trim()).map((l) => `<span class="eq-line">${l}</span>`).join('')}</span>`;
       }
       return parts.join('');
     }
@@ -228,7 +234,7 @@
         const rad = n.kids.find((k) => k.cls && k.cls.includes('eq-rad') && !k.cls.includes('sign'));
         { const r = rad ? text(rad).trim() : ''; return `${idxN ? text(idxN) : ''}√${r.length > 1 && !/^\(.*\)$/.test(r) ? `(${r})` : r}`; }   // 이미 괄호로 싸였으면 한 번 더 싸지 않는다
       }
-      if (n.cls.includes('eq-pile')) return n.kids.map(text).join('; ');
+      if (n.cls.includes('eq-pile') || n.cls.includes('eq-lines')) return n.kids.map(text).join('; ');
       if (n.tag === 'sup' && !n.cls.includes('eq-idx')) { const t = inner().trim(); return [...t].every((c) => SUP[c]) ? [...t].map((c) => SUP[c]).join('') : `^${wrap(t)}`; }
       return inner();
     };

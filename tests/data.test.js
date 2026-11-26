@@ -85,3 +85,23 @@ if (fs.existsSync(path.join(__dirname, '..', 'web', 'pdf', '4.pdf'))) {
   assert(!sec('4-app-5.3.2~2'), "'5.3.2~2' 같은 겹친 번호가 없어야");
   console.log('원문 창: 문단·표·그림', paraPages, '개에 쪽, 2차원/3차원 제목 OK');
 }
+
+// 검토 6차: 한컴 전용 글자(빈칸으로 보임) 없음(알려진 4-5.9.2의 U+E04D 하나만), 장 표지 목차가 그림으로 끼지 않음, 목차 오타 제목 고침
+{
+  let pua = 0, tocFig = 0;
+  const walk = (x) => {
+    if (typeof x === 'string') { if (/[\u{F0000}-\u{FFFFD}]/u.test(x) || /[豈-﫿]/.test(x)) pua++; }
+    else if (Array.isArray(x)) x.forEach(walk);
+    else if (x && typeof x === 'object') for (const k in x) if (k !== 'eq') walk(x[k]);
+  };
+  for (const v of window.KRC_DATA.vols) for (const s of v.sections) {
+    walk(s.blocks);
+    for (const b of s.blocks) if (b.t === 'fig' && b.caption && /^\s*제\s*\d+\s*장/.test(b.caption) && (b.caption.match(/\n\s*\d+\.\d+/g) || []).length >= 5) tocFig++;
+  }
+  assert.strictEqual(pua, 0, '한컴 전용·호환 한자 글자 ' + pua);
+  assert.strictEqual(tocFig, 0, '장 표지 목차 그림 ' + tocFig);
+  const t = (id) => window.KRC_DATA.vols.flatMap((v) => v.sections).find((s) => s.id === id);
+  assert.strictEqual(t('4-4.8.8').title, '축조재료 및 장비');
+  assert(!t('4-app-2.2'), '목록 항목이 절로 남음(4-app-2.2)');
+  console.log('글자·목차 그림·제목 고침 OK');
+}

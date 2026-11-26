@@ -457,6 +457,7 @@
   }
   const q2 = (q) => encodeURIComponent(q || '');
   const numTag = (n) => (n ? `<span class="num">${esc(n)}</span>` : '');   // 참고문헌·부록처럼 번호 없는 장은 태그를 그리지 않는다
+  const canShare = () => !!navigator.share && window.matchMedia('(pointer: coarse)').matches;   // 손가락 기기에서만 '공유'
   const wide = (px) => window.matchMedia(`(min-width: ${px + 1}px)`).matches;
   const chapterSection = (vol, ch) => idx.byId.get(`${vol}-ch${ch}`);
 
@@ -846,6 +847,21 @@
     if (blocks[j] && blocks[j].t === 'p' && FIG_CAP.test(blocks[j].text.trim()) && blocks[j].text.length < 80) { caption = blocks[j].text.trim(); j++; }
     return { end: j, texts, caption };
   }
+  /** 그림 자리 상자: 제목 + '원문 n쪽에서 그림 보기' + 그림 속 글자 */
+  function figBox(s, bi, caption, texts, exact, open, hl) {
+    const figPage = canPane(s) ? (exact || s.pdf) : 0;
+    const fh = figPage
+      ? `<button type="button" class="fh fh-btn" data-act="pdf-at" data-page="${figPage}">${I.img}<span><strong>${caption ? hl(caption) : '그림'}</strong> <span class="go">${exact ? `원문 ${printedOf(s, figPage)}쪽에서 그림 보기 →` : '원문 쪽에서 보기 →'}</span></span></button>`
+      : `<div class="fh">${I.img}<span><strong>${caption ? hl(caption) : '그림'}</strong> <span class="muted">— 그림은 원문에서 확인하세요${s.page ? ` (이 절 p.${s.page}~)` : ''}</span></span></div>`;
+    return `<div class="figph" data-bi="${bi}">${fh}${texts.length ? `<details${open ? ' open' : ''}><summary>그림 속 글자 ${texts.length}개 보기</summary><ul>${texts.map((t) => `<li>${hl(t)}</li>`).join('')}</ul></details>` : ''}</div>`;
+  }
+  /** 표 틀로 그린 그림(흐름도 등): '[그림 …]' 제목이면서 칸 절반 넘게 비었거나, 제목 없이 40칸 넘게 80% 넘게 빈 표 */
+  function tableIsFigure(b) {
+    const n = b.cells.length;
+    if (!n) return false;
+    const empty = b.cells.filter((c) => !c.text.trim()).length / n;
+    return (/^\s*\[그림/.test(b.caption || '') && empty > 0.5) || (!b.caption && n >= 40 && empty > 0.8);
+  }
   function renderBlocks(s, alts) {
     const out = [];
     const hl = (t) => (alts && alts.length ? S.highlight(t, alts) : esc(t));
@@ -863,8 +879,15 @@
         out.push(`<p data-bi="${bi}"${cls ? ` class="${cls}"` : ''}>${renderRuns(b, alts)}</p>`);
       } else if (b.t === 'table') {
         if (b.rows * b.cols <= 1 && !b.caption) {
-          const txt = (b.cells[0] && b.cells[0].text) || '';
-          if (txt) out.push(`<div class="note" data-bi="${bi}">${alts && alts.length ? S.highlight(txt, alts) : esc(txt)}</div>`);
+          const c = b.cells[0];   // 한 칸짜리 표 = 원문의 글상자. 수식·첨자가 있으면 runs로 그린다(수식 문법이 그대로 보이지 않게)
+          if (c && c.text.trim()) out.push(`<div class="note" data-bi="${bi}">${c.runs ? c.runs.map((r) => runHtml(r, hl)).join('') : hl(c.text)}</div>`);
+          return;
+        }
+        if (tableIsFigure(b)) {
+          const texts = b.cells.map((c) => S.plainText(c).replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
+          const nAlts = (alts || []).map(S.norm);
+          const open = texts.some((t) => nAlts.some((a) => a && S.norm(t).includes(a)));
+          out.push(figBox(s, bi, b.caption || '', texts, (s.pdf_blocks && s.pdf_blocks[bi]) || 0, open, hl));
           return;
         }
         out.push(`<figure data-bi="${bi}"><figcaption><span>${b.caption ? (alts && alts.length ? S.highlight(b.caption, alts) : esc(b.caption)) : '표'}</span>
@@ -879,11 +902,7 @@
         // 그림 쪽: 그림 제목 문단의 쪽, 없으면 바로 뒤·앞 문단의 쪽(그림은 그 사이에 있다)
         const pb = s.pdf_blocks || {};
         const exact = (f.caption && pb[f.end - 1]) || pb[f.end] || pb[bi - 1] || 0;
-        const figPage = canPane(s) ? (exact || s.pdf) : 0;
-        const fh = figPage
-          ? `<button type="button" class="fh fh-btn" data-act="pdf-at" data-page="${figPage}">${I.img}<span><strong>${f.caption ? hl(f.caption) : '그림'}</strong> <span class="go">${exact ? `원문 ${printedOf(s, figPage)}쪽에서 그림 보기 →` : '원문 쪽에서 보기 →'}</span></span></button>`
-          : `<div class="fh">${I.img}<span><strong>${f.caption ? hl(f.caption) : '그림'}</strong> <span class="muted">— 그림은 원문에서 확인하세요${s.page ? ` (이 절 p.${s.page}~)` : ''}</span></span></div>`;
-        out.push(`<div class="figph" data-bi="${bi}">${fh}${f.texts.length ? `<details${hitInside ? ' open' : ''}><summary>그림 속 글자 ${f.texts.length}개 보기</summary><ul>${f.texts.map((t) => `<li>${hl(t)}</li>`).join('')}</ul></details>` : ''}</div>`);
+        out.push(figBox(s, bi, f.caption, f.texts, exact, hitInside, hl));
       }
     });
     return out.join('');
@@ -922,7 +941,7 @@
           <span class="muted" style="margin-right:6px">${s.page ? `원문 p.${s.page}~` : s.page_between ? `원문 p.${s.page_between[0]}~${s.page_between[1]} 사이 (목차에 없는 절)` : '원문 쪽 정보 없음'}</span>
           <button type="button" class="btn outline" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>
           ${pdfToggle(s, s.pdf)}
-          <button type="button" class="btn" data-act="link">${I.link}링크 복사</button>
+          <button type="button" class="btn" data-act="link">${I.link}${canShare() ? '공유' : '링크 복사'}</button>
           <button type="button" class="btn" data-act="print">${I.print}인쇄</button>
           ${q ? `<span class="hitnav" data-q="${esc(q)}"><span>‘${esc(q)}’ <strong data-hitpos>0</strong> / <span data-hittotal>0</span></span><button type="button" data-act="hit-prev" aria-label="이전 일치 항목">${I.up}</button><button type="button" data-act="hit-next" aria-label="다음 일치 항목">${I.down}</button></span>` : ''}
         </div>
@@ -945,7 +964,7 @@
     const cnt = {};
     all.forEach((t) => { cnt[t.s.vol] = (cnt[t.s.vol] || 0) + 1; });
     const chipHref = (v) => `#/tables${q || v ? '?' + new URLSearchParams(Object.assign(q ? { q } : {}, v ? { v } : {})) : ''}`;
-    const chips = all.length ? `<nav class="chips" aria-label="편으로 좁히기"><a href="${chipHref(0)}"${vsel ? '' : ' aria-current="true"'}>전체 <span>${all.length}</span></a>${D.vols.filter((v) => cnt[v.id]).map((v) => `<a href="${chipHref(v.id)}"${vsel === v.id ? ' aria-current="true"' : ''}>제${v.id}편 ${esc(v.name)} <span>${cnt[v.id]}</span></a>`).join('')}</nav>` : '';
+    const chips = Object.keys(cnt).length > 1 ? `<nav class="chips" aria-label="편으로 좁히기"><a href="${chipHref(0)}"${vsel ? '' : ' aria-current="true"'}>전체 <span>${all.length}</span></a>${D.vols.filter((v) => cnt[v.id]).map((v) => `<a href="${chipHref(v.id)}"${vsel === v.id ? ' aria-current="true"' : ''}>제${v.id}편 ${esc(v.name)} <span>${cnt[v.id]}</span></a>`).join('')}</nav>` : '';
     const byVol = {};
     shown.forEach((t) => { (byVol[t.s.vol] = byVol[t.s.vol] || []).push(t); });
     const tabs = q ? resultTabs(q, 'tables', null, list.length) : '';
@@ -1310,7 +1329,9 @@
       const s = idx.byId.get(el.dataset.id);
       if (s) copyText(citation(s, el.dataset.extra), '출처를 복사했습니다');
     } else if (act === 'link') {
-      copyText(location.href, '링크를 복사했습니다');
+      // 폰: 공유 창(카카오톡·문자·메일)으로 바로 — 현장에서 링크를 복사해 붙여 넣는 수고를 던다. 취소하면 아무것도 안 함
+      if (canShare()) navigator.share({ title: document.title, url: location.href }).catch((err) => { if (err && err.name !== 'AbortError') copyText(location.href, '링크를 복사했습니다'); });
+      else copyText(location.href, '링크를 복사했습니다');
     } else if (act === 'print') {
       window.print();
     } else if (act === 'copy-table' || act === 'csv') {
