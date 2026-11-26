@@ -1543,6 +1543,7 @@
   function render(hash) {
     const { parts, params } = parseHash(typeof hash === 'string' ? hash : undefined);
     if (askCtl) { askCtl.abort(); askCtl = null; }   // 화면을 떠나면 진행 중인 답변 요청을 끊는다
+    document.documentElement.classList.remove('nav-hidden');   // 새 화면에서는 하단 탭을 다시 보인다
     let html;
     switch (parts[0]) {
       case 'search': html = viewSearch(params); break;
@@ -1765,6 +1766,28 @@
   }
 
   /* ---------------- 이벤트 ---------------- */
+  // 폰: 아래로 내리면 하단 탭을 숨겨 읽을 자리를 넓히고, 위로 조금만 올리거나 맨 위·맨 끝에 닿으면 다시 보인다
+  (() => {
+    const root = document.documentElement;
+    let lastY = window.scrollY, ticking = false;
+    const set = (hide) => { if (root.classList.contains('nav-hidden') !== hide) root.classList.toggle('nav-hidden', hide); };
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        if (wide(700) || root.classList.contains('sheet-open')) { set(false); lastY = window.scrollY; return; }
+        const y = window.scrollY, dy = y - lastY;
+        const atEnd = y + window.innerHeight >= root.scrollHeight - 8;
+        if (y < 64 || atEnd) set(false);
+        else if (dy > 10) set(true);   // 손가락 떨림(몇 px)에는 반응하지 않게
+        else if (dy < -10) set(false);
+        if (Math.abs(dy) > 10 || y < 64) lastY = y;
+      });
+    }, { passive: true });
+    // 키보드로 하단 탭에 들어오면 늘 보이게
+    document.addEventListener('focusin', (e) => { if (e.target.closest && e.target.closest('.bottomnav')) set(false); });
+  })();
   app.addEventListener('submit', (e) => {
     const tf = e.target.closest('form[data-form="terms"], form[data-form="fac"]');
     if (tf) {   // 용어 찾기·시설 찾기: 칸의 값으로 주소를 바꾼다

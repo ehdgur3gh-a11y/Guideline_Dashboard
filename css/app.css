@@ -888,3 +888,15 @@ footer.src { background: var(--bg); border-top-color: var(--line); }
 /* 흐림을 못 쓰는 브라우저·'투명도 줄이기'를 켠 사람은 흰 막대로(글자가 늘 또렷하게) */
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { @media (max-width: 700px) { .bottomnav { background: var(--surface); border-color: var(--line); } } }
 @media (prefers-reduced-transparency: reduce) and (max-width: 700px) { .bottomnav { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--line); } }
+
+/* ---------- 검토 18차: 내리면 하단 탭 숨김, 올리면 다시 ---------- */
+@media (max-width: 700px) {
+  .bottomnav { transition: transform .28s ease, opacity .28s ease; will-change: transform; }
+  html.nav-hidden .bottomnav { transform: translateY(calc(100% + 18px + env(safe-area-inset-bottom))); opacity: 0; pointer-events: none; }
+  /* 탭 위에 떠 있던 것들은 탭이 비킨 만큼 내려온다 */
+  .totop, .findbar, #toast, .article .toolbar > .hitnav:not(.none) { transition: bottom .28s ease; }
+  html.nav-hidden .totop, html.nav-hidden .findbar, html.nav-hidden .article .toolbar > .hitnav:not(.none) { bottom: calc(16px + env(safe-area-inset-bottom)); }
+  html.nav-hidden #toast { bottom: calc(24px + env(safe-area-inset-bottom)); }
+  html.nav-hidden.has-hitbar .totop { bottom: calc(78px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .bottomnav, .totop, .findbar, #toast, .article .toolbar > .hitnav { transition: none !important; } }
