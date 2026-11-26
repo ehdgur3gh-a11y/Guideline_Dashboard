@@ -670,3 +670,43 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
 .spec > div.warn { background: #FFF4E5; }
 .spec .wn { display: block; color: #8A4B00; font-weight: 400; font-size: 0.8125rem; }
 .flow-page .overall { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.9375rem; }
+
+/* ---------- 검토 11차: 폰 화면 정리(A 원문 읽기 · B 업무 흐름 · C 검색 결과 · D 시설정보) ---------- */
+.pshort { display: none; }
+.matrix > summary h2 { margin: 0; font-size: 1.1875rem; }
+.matrix > summary { gap: 10px; }
+.matrix > summary .muted { font-size: 0.9375rem; font-weight: 400; }
+details.present > summary { font-weight: 400; color: var(--ink-2); font-size: 0.9375rem; }
+details.present > summary small { color: var(--muted); margin-left: 4px; }
+@media (min-width: 701px) {
+  details.present > summary { display: none; }   /* 넓은 화면은 현황 칩을 늘 펼쳐 둔다(전과 같게) */
+  .matrix > summary .muted, .matrix > summary::after { display: none; }
+  .matrix > summary { pointer-events: none; }
+}
+@media (max-width: 700px) {
+  /* A. 원문 읽기: 흰 카드를 화면 끝까지 — 글 폭을 넓히고 테두리·회색 여백을 없앤다 */
+  .article { margin: -14px -12px 0; padding: 14px 16px 24px; border: 0; border-radius: 0; }
+  .article .path .pfull { display: none; }
+  .article .path .pshort { display: inline; }
+  .article h1 { margin: 2px 0 10px; }
+  .article .toolbar { flex-wrap: wrap; gap: 8px; }
+  .article .toolbar > .btn { flex: 0 0 auto; flex-direction: row; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 22px; font-size: 0.9375rem; }
+  /* B. 업무 흐름: 설명은 제목 아래 줄, 흐름도는 한 줄씩, 사업×단계 표는 접어 두기 */
+  .pagehead { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .step .cnt { flex: none; white-space: nowrap; }
+  .row.flows { flex-direction: column; align-items: stretch; gap: 0; }
+  .row.flows > .muted { margin-bottom: 2px; }
+  .row.flows .flowtag { display: flex; min-height: 44px; padding: 6px 2px; border-radius: 0; background: none; color: var(--ink); font-weight: 400; border-bottom: 1px solid var(--line-2); }
+  .row.flows .flowtag:last-child { border-bottom: 0; }
+  .row.flows .flowtag svg { flex: none; color: var(--ok); }
+  .matrix > summary { min-height: 48px; }
+  .matrix > summary h2 { font-size: 1.0625rem; }
+  .matrix table { min-width: 560px; }   /* 펼치면 옆으로 밀어 보기(칸이 찌그러지지 않게) */
+  /* C. 검색 결과: 제목·번호 일치도 다른 결과와 같은 흰 카드, 꼬리표는 작은 표시 하나 */
+  .titlehit { background: var(--surface); border-color: var(--line); }
+  .titlehit .k { align-self: flex-start; padding: 1px 8px; border-radius: 10px; background: var(--primary-5); font-size: 0.8125rem; }
+  .sumline { white-space: normal; overflow: visible; }
+  /* D. 시설정보: 전국 현황은 제목 아래 한 줄(누르면 칩) */
+  details.present > summary { min-height: 40px; }
+  details.present[open] > summary { margin-bottom: 4px; }
+}
