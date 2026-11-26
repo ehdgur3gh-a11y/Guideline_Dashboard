@@ -38,6 +38,9 @@
     outline: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',
     share: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>',
     x: '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    book: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>',
+    home: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-6h4v6"/></svg>',
+    dam: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20l4-11h4l4 11"/><path d="M3 14c2-1.3 3.5-1.3 5 0"/></svg>',
     check: '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
   };
   const fac = (d) => `<svg aria-hidden="true" width="36" height="36" viewBox="0 0 40 40" fill="none" stroke="#1F5FAD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -492,14 +495,16 @@
     return `<header class="topbar${cls ? ' ' + cls : ''}"><div class="in">
       <a class="brand" href="#/">조사설계실무요령</a>${scaleBtnM}
       ${searchForm(q, scope, false)}
-      <nav class="nav" aria-label="주 메뉴">${nav('#/flow', '업무 흐름', 'flow')}${nav('#/s/1-ch1', '전체 목차', 'toc')}${nav('#/tables', '표 모음', 'tables')}${nav('#/saved', '저장한 절', 'saved')}${scaleBtn}</nav>
+      <nav class="nav" aria-label="주 메뉴">${nav('#/terms', '용어', 'terms')}${nav('#/flow', '업무 흐름', 'flow')}${nav('#/fac', '시설정보', 'fac')}${nav('#/s/1-ch1', '목차', 'toc')}${nav('#/tables', '표 모음', 'tables')}${nav('#/saved', '저장', 'saved')}${scaleBtn}</nav>
     </div>${tabs || ''}</header>`;
   }
   function bottomnav(active) {
     const a = (href, icon, label, key, extra = '') => `<a href="${href}"${active === key ? ` aria-current="${key === 'toc' ? 'true' : 'page'}"` : ''}${extra}>${icon}${label}</a>`;
     // 목차: 본문을 읽는 중이면 제1편 첫 장으로 가 버리지 않고 지금 편의 목차를 펼쳐 현재 절로 데려간다
     // 검색: 어느 화면에서든 검색칸으로(그 화면에 검색칸이 보이면 거기, 아니면 첫 화면 검색칸)
-    return `<nav class="bottomnav" aria-label="하단 메뉴">${a('#/', I.search.replace('20', '22').replace('20', '22'), '검색', 'home', ' data-act="search-jump"')}${a('#/s/1-ch1', I.list, '목차', 'toc', ' data-act="toc-jump"')}${a('#/tables', I.table, '표', 'tables')}${a('#/saved', I.bookmark, '저장', 'saved')}</nav>`;
+    // 하단 탭(검토 8차): 홈(검색) → 용어 → 업무 흐름 → 시설정보 — 처음엔 검색, 모르는 말은 용어, 할 일은 업무 흐름, 내 지구는 시설정보
+    // 목차·표 모음·저장한 절은 홈 바로가기와 본문 머리줄 '차례'로
+    return `<nav class="bottomnav" aria-label="하단 메뉴">${a('#/', I.home, '홈', 'home')}${a('#/terms', I.book.replace(/18/g, '22'), '용어', 'terms')}${a('#/flow', I.flow, '업무 흐름', 'flow')}${a('#/fac', I.dam, '시설정보', 'fac')}</nav>`;
   }
   function resultTabs(q, active, nResults, nTables) {
     const t = (href, label, key) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`;
@@ -578,7 +583,7 @@
     document.title = '조사설계실무요령';
     return `<header class="home-top"><div class="in">
         <a class="brand" href="#/">${ORG} <small>조사설계실무요령</small></a>
-        <nav class="nav" aria-label="주 메뉴"><a href="#/flow">업무 흐름</a><a href="#/s/1-ch1">전체 목차</a><a href="#/tables">표 모음</a><a href="#/saved">저장한 절</a>${scaleBtn}</nav>${scaleBtnM}
+        <nav class="nav" aria-label="주 메뉴"><a href="#/terms">용어</a><a href="#/flow">업무 흐름</a><a href="#/fac">시설정보</a><a href="#/s/1-ch1">목차</a><a href="#/tables">표 모음</a><a href="#/saved">저장</a>${scaleBtn}</nav>${scaleBtnM}
       </div></header>
       <main id="main" class="home-main">
         <section class="hero" aria-label="검색">
@@ -586,7 +591,14 @@
           <div class="row">${searchForm('', 'all', true)}${FEATURES.ask ? `<a class="ask" href="#/ask" data-act="ask">${I.ask}질문하기</a>` : ''}</div>
           <p class="ex">예: <a href="#/search?q=${q2('여유고')}">여유고</a> · <a href="#/search?q=${q2('물넘이')}">물넘이</a> · <a href="#/s/1-4.2.1">4.2.1</a> · <a href="#/search?q=${q2('물넘이 게이트가 없는 필댐의 여유고')}">물넘이 게이트가 없는 필댐의 여유고</a></p>
         </section>
+        <nav class="quick" aria-label="바로가기"><a href="#/s/1-ch1">${I.list}전체 목차</a><a href="#/tables">${I.table}표 모음</a><a href="#/saved">${I.bookmark}저장한 절</a></nav>
         ${mineHtml()}
+        <section class="guide" aria-label="이렇게 쓰면 편합니다"><h2>이렇게 쓰면 편합니다</h2><ol>
+          <li><a href="#/" data-act="search-jump"><strong>1</strong><span>검색으로 찾기<small>낱말·문장·절 번호</small></span></a></li>
+          <li><a href="#/terms"><strong>2</strong><span>모르는 용어<small>원문 정의 ${GL.length}개</small></span></a></li>
+          <li><a href="#/flow"><strong>3</strong><span>업무 흐름<small>단계마다 할 일</small></span></a></li>
+          <li><a href="#/fac"><strong>4</strong><span>내 지구 시설<small>저수지·양수장 제원</small></span></a></li>
+        </ol></section>
         <section class="facilities" aria-label="시설·분야로 찾기">
           <div class="head"><h2>시설·분야로 찾기</h2><a href="#/flow">업무 흐름으로 보기 →</a></div>
           <div class="tiles">${FACILITIES.map(([n, id, d]) => `<a class="tile" href="#/s/${id}"><span class="ic">${fac(d)}</span>${n}</a>`).join('')}</div>
@@ -626,6 +638,7 @@
     const vTotal = Object.values(r.counts).reduce((a, b) => a + b, 0);
     const vchips = Object.keys(r.counts).length > 1 ? `<nav class="chips vchips" aria-label="편으로 좁히기"><a href="${vHref(0)}"${vols.size ? '' : ' aria-current="true"'}>전체 <span>${vTotal}</span></a>${D.vols.filter((v) => r.counts[v.id]).map((v) => `<a href="${vHref(v.id)}"${one === v.id ? ' aria-current="true"' : ''}>제${v.id}편 ${esc(v.name)} <span>${r.counts[v.id]}</span></a>`).join('')}</nav>` : '';
 
+    const defHit = scope === 'body' ? null : termFor(q, r.terms);   // 검색어가 용어면 맨 위에 정의
     const numCards = numHits.slice(0, 4).map((s) => `<a class="titlehit" href="#/s/${s.id}"><span class="k">절 번호로 바로 가기</span><span class="t">${numTag(s.num)}<span class="tt">${esc(s.title)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
     const titleCards = r.titleHits.map((s) => `<a class="titlehit" href="#/s/${s.id}?q=${q2(q)}"><span class="k">절 제목 일치${s.title_raw && s.title_raw !== s.title ? ` — 원문 표기 ‘${esc(s.title_raw)}’` : ''}</span><span class="t">${numTag(s.num)}<span class="tt">${S.highlight(s.title, r.alts)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
     const items = shown.map((hit) => {
@@ -645,7 +658,7 @@
         <h1 class="sr">‘${esc(q)}’ 검색 결과</h1>
         ${vchips}${sumLine}
         <div class="summary"><span class="muted">‘${esc(q)}’ <strong style="color:var(--ink)">${r.hits.length}개 절</strong> · ${r.total}문단</span>${notes.join('')}</div>
-        ${numCards}${titleCards}
+        ${defHit ? defCard(defHit) : ''}${numCards}${titleCards}
         ${items ? `<ol class="results">${items}</ol>${more}` : `<p class="empty card">찾는 내용이 없습니다. 다른 낱말이나 절 번호로 찾아보세요.</p>`}
       </div>
       <aside class="side">
@@ -1195,6 +1208,141 @@
     </div></main>${bottomnav('tables')}`;
   }
 
+  /* ---------------- 용어 사전 (web/data/glossary.js — 실무요령 원문 정의 + RAWRIS 용어) ---------------- */
+  const GL = (window.KRC_TERMS && window.KRC_TERMS.terms) || [];
+  const glByKey = new Map();
+  GL.forEach((g) => {
+    glByKey.set(S.norm(g.t), g);
+    if (g.alt && /[A-Za-z一-龥]/.test(g.alt) && g.alt.length <= 30) glByKey.set(S.norm(g.alt.replace(/\s*[:：].*$/, '')), g);
+  });
+  /** 검색어가 용어 하나와 같으면 그 용어 (조사를 뗀 형태로도) */
+  function termFor(q, terms) {
+    const cands = [q, ...(terms || [])].map((x) => S.norm(x || '')).filter(Boolean);
+    for (const c of cands) if (glByKey.has(c)) return glByKey.get(c);
+    return null;
+  }
+  const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+  const CHO_BASE = { 'ㄲ': 'ㄱ', 'ㄸ': 'ㄷ', 'ㅃ': 'ㅂ', 'ㅆ': 'ㅅ', 'ㅉ': 'ㅈ' };
+  function initialOf(t) {
+    const c = (t || '').charCodeAt(0);
+    if (c >= 0xAC00 && c <= 0xD7A3) { const ch = CHO[Math.floor((c - 0xAC00) / 588)]; return CHO_BASE[ch] || ch; }
+    return 'A–Z';
+  }
+  const termSlug = (t) => encodeURIComponent(t);
+  /** 정의 하나의 출처 링크 */
+  function defSource(d) {
+    if (d.ext === 'rawris') return `<a class="dsrc" href="${esc(window.KRC_TERMS.rawris)}" target="_blank" rel="noopener">RAWRIS 농업생산기반시설 용어 ↗</a>`;
+    const s = idx.byId.get(d.id);
+    if (!s) return '';
+    return `<a class="dsrc" href="#/s/${s.id}">제${s.vol}편 ${esc(volOf(s).name)} › ${esc([s.num, s.title].filter(Boolean).join(' '))}${s.page ? ' · p.' + s.page : ''} →</a>`;
+  }
+  /** 검색결과 맨 위 '용어 정의' 카드 */
+  function defCard(g) {
+    const [first, ...rest] = g.defs;
+    const near = first.id ? GL.filter((x) => x !== g && x.defs.some((d) => d.id === first.id)).slice(0, 4) : [];
+    return `<section class="defcard" aria-label="용어 정의">
+      <p class="k">${I.book}용어 정의</p>
+      <h2>${esc(g.t)}${g.alt ? ` <span class="alt">${esc(g.alt)}</span>` : ''}</h2>
+      <p class="d">${esc(first.d)}</p>
+      ${defSource(first)}
+      ${rest.length ? `<details><summary>다른 정의 ${rest.length}개</summary>${rest.map((d) => `<div class="more"><p class="d">${esc(d.d)}</p>${defSource(d)}</div>`).join('')}</details>` : ''}
+      <p class="rel">${near.length ? `<span class="muted">관련</span>${near.map((x) => `<a href="#/terms?t=${termSlug(x.t)}">${esc(x.t)}</a>`).join('')}` : ''}<a class="all" href="#/terms?t=${termSlug(g.t)}">용어 사전에서 보기 →</a></p>
+    </section>`;
+  }
+  function viewTerms(params) {
+    document.title = '용어 — 조사설계실무요령';
+    const q = (params.get('q') || '').trim();
+    const ini = params.get('i') || '';
+    const focus = params.get('t') || '';
+    const nq = S.norm(q);
+    let list = GL;
+    if (nq) list = list.filter((g) => S.norm(g.t).includes(nq) || S.norm(g.alt || '').includes(nq) || g.defs.some((d) => S.norm(d.d).includes(nq)));
+    if (ini) list = list.filter((g) => initialOf(g.t) === ini);
+    const inis = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'A–Z'];
+    const have = new Set(GL.map((g) => initialOf(g.t)));
+    const href = (o) => `#/terms${Object.keys(o).length ? '?' + new URLSearchParams(o) : ''}`;
+    const chips = `<nav class="chips ini" aria-label="첫 글자로 찾기"><a href="${href(q ? { q } : {})}"${ini ? '' : ' aria-current="true"'}>전체</a>${inis.filter((c) => have.has(c)).map((c) => `<a href="${href(Object.assign(q ? { q } : {}, { i: c }))}"${ini === c ? ' aria-current="true"' : ''}>${c}</a>`).join('')}</nav>`;
+    const hl = (t) => (q ? S.highlight(t, [q]) : esc(t));
+    const groups = [];
+    list.forEach((g) => { const c = initialOf(g.t); if (!groups.length || groups[groups.length - 1].c !== c) groups.push({ c, items: [] }); groups[groups.length - 1].items.push(g); });
+    const nOrig = GL.reduce((n, g) => n + g.defs.filter((d) => d.id).length, 0);
+    return topbar('', 'all', 'terms') + `<main id="main" class="page"><div class="main terms-page">
+      <div class="pagehead"><h1>용어</h1><span class="muted">${GL.length}개 · 실무요령 원문 정의 ${nOrig}개 + RAWRIS 용어</span></div>
+      <form class="tfind" data-form="terms" role="search"><label class="btn tv-find">${I.search}<span class="sr">용어 찾기</span><input name="q" type="search" value="${esc(q)}" placeholder="용어 찾기 (예: 조위, 이음, 수혜)" spellcheck="false" autocomplete="off" enterkeyhint="search"></label></form>
+      ${chips}
+      ${groups.length ? groups.map((gr) => `<section class="tgroup"><h2>${gr.c}</h2>${gr.items.map((g) => `<article class="term" id="term-${esc(g.t)}"${focus && focus === g.t ? ' data-focus="1"' : ''}>
+        <h3>${hl(g.t)}${g.alt ? ` <span class="alt">${esc(g.alt)}</span>` : ''}</h3>
+        ${g.defs.map((d) => `<div class="def"><p class="d">${hl(d.d)}</p>${defSource(d)}</div>`).join('')}
+      </article>`).join('')}</section>`).join('') : '<p class="empty card">해당하는 용어가 없습니다. 검색에서 찾아보세요.</p>'}
+      <p class="muted" style="font-size:.9375rem">원문에서 ‘…을 말한다’ 꼴의 정의를 기계로 뽑아 한 번 걸렀습니다. 정의가 이상하면 원문 절에서 확인하세요.</p>
+    </div></main>${bottomnav('terms')}`;
+  }
+
+  /* ---------------- 시설정보 (web/data/fac.js — 공공데이터포털 시설제원, 처음 열 때 불러온다) ---------------- */
+  let facLoading = null;
+  function loadFac() {
+    if (window.KRC_FAC) return Promise.resolve();
+    if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js'; sc.onload = res; sc.onerror = () => { facLoading = null; rej(); }; document.head.appendChild(sc); });
+    return facLoading;
+  }
+  const FAC_KEY_STAT = { 저수지: '총저수량', 양배수장: '수혜면적', 취입보: '수혜면적', 방조제: '제체 길이', 관정: '일 양수량', 집수암거: '매설 길이' };
+  const fmtNum = (v) => (typeof v === 'number' ? v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : esc(String(v)));
+  function viewFac(params) {
+    document.title = '시설정보 — 조사설계실무요령';
+    if (!window.KRC_FAC) {
+      loadFac().then(() => { if (parseHash().parts[0] === 'fac') render(location.hash); }, () => toast('시설 자료를 불러오지 못했습니다'));
+      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main"><p class="boot" role="status">시설 자료를 불러오는 중…</p></div></main>${bottomnav('fac')}`;
+    }
+    const F = window.KRC_FAC;
+    const type = F.types.find((t) => t.key === params.get('t')) || F.types[0];
+    const sido = params.get('sido') || '';
+    const sgg = sido ? params.get('sgg') || '' : '';   // 시도 없이 남은 시군구는 무시
+    const q = (params.get('q') || '').trim();
+    const open = params.get('id') || '';
+    const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
+    const nq = S.norm(q);
+    const sidos = [...new Set(F.types.flatMap((t) => t.rows.map((r) => r[3])).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+    const sggs = sido ? [...new Set(type.rows.filter((r) => r[3] === sido).map((r) => r[4]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')) : [];
+    const rows = type.rows.filter((r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq)));
+    const per = 50, shown = rows.slice(0, page * per);
+    const ki = type.cols.findIndex(([n]) => n === FAC_KEY_STAT[type.key]);
+    const P = F.present;
+    const link = (o) => `#/fac?${new URLSearchParams(Object.assign({ t: type.key }, sido ? { sido } : {}, sgg ? { sgg } : {}, q ? { q } : {}, o))}`;
+    const guideOf = (r) => (F.guide[type.key === '양배수장' ? (r[7] === '배수' ? '배수' : '양수') : type.key] || []).concat(type.key === '양배수장' && r[7] === '양배수' ? F.guide['배수'] : []);
+    const BIZ_OF = { 저수지: 0, 양배수장: 0, 취입보: 0, 방조제: 3 };
+    const card = (r) => {
+      const stat = ki >= 0 && r[10][ki] != null ? `${fmtNum(r[10][ki])} ${type.cols[ki][1]}` : '';
+      const specs = type.cols.map(([n, u], i) => (r[10][i] == null || r[10][i] === 0 || r[10][i] === '' ? '' : `<div><dt>${esc(n)}</dt><dd>${fmtNum(r[10][i])}${u ? ` <small>${esc(u)}</small>` : ''}</dd></div>`)).join('');
+      const g = guideOf(r);
+      return `<li><details${open === r[0] ? ' open' : ''}><summary>
+          <span class="fh"><strong>${esc(r[1])}</strong><span class="muted">${esc(type.label)}${r[7] ? `(${esc(r[7])})` : ''} · ${esc(r[6] || '')}</span>${stat ? `<span class="st">${stat}</span>` : ''}</span>
+          <span class="muted fa">${esc(r[2])}${r[5] ? ` · ${esc(r[5])}년 준공` : ''}</span>
+        </summary>
+        <div class="fbody">
+          ${specs ? `<dl class="spec">${specs}</dl>` : ''}
+          ${r[8] || r[9] ? `<p class="muted" style="margin:0;font-size:.9375rem">관리: ${r[8] ? esc(r[8]) + '지사' : ''}${r[9] ? ` · <a href="tel:${esc(r[9].replace(/[^\d]/g, ''))}">${esc(r[9])}</a>` : ''}</p>` : ''}
+          <div class="facts">${g.map(([id, label]) => `<a class="btn outline" href="#/s/${id}">설계 기준: ${esc(label)}</a>`).join('')}${BIZ_OF[type.key] != null ? `<a class="btn" href="#/flow?b=${BIZ_OF[type.key]}">업무 흐름에서 보기</a>` : ''}<a class="btn" href="https://rawris.ekr.or.kr/selectFacList.do" target="_blank" rel="noopener" title="RAWRIS 시설 검색에서 시설명으로 찾아보세요">RAWRIS ↗</a></div>
+          <p class="muted" style="margin:0;font-size:.875rem">표준코드 ${esc(r[0])} · 자료 기준 ${esc(F.dates[type.key] || '')}</p>
+        </div></details></li>`;
+    };
+    return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page">
+      <div class="pagehead"><h1>시설정보</h1><span class="muted">농업생산기반시설 · 공사 관리 ${F.types.reduce((n, t) => n + t.rows.length, 0).toLocaleString('ko-KR')}곳</span></div>
+      <nav class="chips present" aria-label="전국 현황 (통계연보 2024)"><span class="tot">전국 <strong>${P.total[0].toLocaleString('ko-KR')}</strong></span>${P.rows.map(([n, all, krc]) => `<span>${esc(n)} <strong>${all.toLocaleString('ko-KR')}</strong><small>공사 ${krc.toLocaleString('ko-KR')}</small></span>`).join('')}</nav>
+      <form class="facform" data-form="fac" role="search" aria-label="시설 찾기">
+        <input type="hidden" name="t" value="${esc(type.key)}">
+        <label class="btn tv-find">${I.search}<span class="sr">시설명 또는 소재지</span><input name="q" type="search" value="${esc(q)}" placeholder="시설명·소재지 (예: 용천, 기장군)" spellcheck="false" autocomplete="off" enterkeyhint="search"></label>
+        <div class="sel2">
+          <label><span class="sr">시도</span><select name="sido" data-act="fac-sido"><option value="">시도 전체</option>${sidos.map((x) => `<option${x === sido ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+          <label><span class="sr">시군구</span><select name="sgg" data-act="fac-sgg"${sido ? '' : ' disabled'}><option value="">시군구 전체</option>${sggs.map((x) => `<option${x === sgg ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+        </div>
+      </form>
+      <nav class="chips" aria-label="시설 구분">${F.types.map((t) => `<a href="${link({ t: t.key })}"${t === type ? ' aria-current="true"' : ''}>${esc(t.label)} <span>${(sido || sgg || q ? t.rows.filter((r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq))).length : t.rows.length).toLocaleString('ko-KR')}</span></a>`).join('')}</nav>
+      <p class="muted" style="margin:0">${esc([sido, sgg].filter(Boolean).join(' ') || '전국')} ${esc(type.label)} <strong style="color:var(--ink)">${rows.length.toLocaleString('ko-KR')}곳</strong>${q ? ` · ‘${esc(q)}’` : ''}</p>
+      ${rows.length ? `<ol class="faclist">${shown.map(card).join('')}</ol>${rows.length > shown.length ? `<a class="btn" style="align-self:center" href="${link({ page: page + 1 })}">더 보기 (${(rows.length - shown.length).toLocaleString('ko-KR')}곳 남음)</a>` : ''}` : '<p class="empty card">해당하는 시설이 없습니다. 시군 관리 시설은 RAWRIS에서 찾아보세요.</p>'}
+      <p class="muted" style="font-size:.875rem;margin:0">자료: ${esc(F.source)} — 공사가 관리하는 시설만 들어 있습니다(시군 관리 ${P.total[2].toLocaleString('ko-KR')}곳은 <a href="https://rawris.ekr.or.kr/selectFacList.do" target="_blank" rel="noopener">RAWRIS 시설 검색 ↗</a>). 현황: ${esc(P.source)}.</p>
+    </div></main>${bottomnav('fac')}`;
+  }
+
   /* ---------------- 업무 흐름 ---------------- */
   const BIZ = [1, 2, 3, 4];
   function flowSteps(vol) {
@@ -1222,28 +1370,48 @@
     const v = D.vols.find((x) => x.id === vol);
     document.title = '업무 흐름 — 조사설계실무요령';
     const steps = flowSteps(vol);
-    const flows = v.sections.filter((s) => s.level > 1 && /흐름도|체계도/.test(s.title));
+    const openStep = parseInt(params.get('st'), 10) || 0;
+    // 단계마다: 할 일(장의 절 차례) · 흐름도 · 산출물 · 관련 용어 · 관련 시설
+    const secsOf = (ch) => { const vv = volOf(ch); const out = []; for (let i = ch.order + 1; i < vv.sections.length && vv.sections[i].level > 1; i++) out.push(vv.sections[i]); return out; };
+    const FAC_OF = { 1: [['저수지', '저수지'], ['양배수장', '양수장'], ['취입보', '취입보']], 2: [['양배수장', '배수장']], 4: [['방조제', '방조제']] };
+    const stepHtml = (st) => {
+      const chs = st.items;
+      const kids = chs.flatMap(secsOf);
+      const todo = chs.length === 1 ? kids.filter((x) => x.level === 2) : [];
+      const flows = kids.filter((x) => /흐름도|체계도/.test(x.title)).slice(0, 6);
+      const report = st.own ? kids.filter((x) => x.level === 2 && /보고서/.test(x.title)).slice(-1)[0] : null;
+      const ids = new Set(chs.flatMap((c) => [c.id, ...secsOf(c).map((x) => x.id)]));
+      const terms = GL.filter((g) => g.defs.some((d) => ids.has(d.id))).slice(0, 8);
+      const facs = st.n === 1 || st.n === 3 ? FAC_OF[vol] || [] : [];
+      const open = openStep ? openStep === st.n : (st.n === 1 || wide(1100));
+      const list = todo.length
+        ? `<p class="lead">이 단계에서 할 일 (차례대로)</p><ol class="todo">${todo.map((x) => `<li><a href="#/s/${x.id}"><span class="n">${esc(x.num)}</span><span class="t">${esc(x.title)}</span>${x.page ? `<span class="muted">p.${x.page}</span>` : ''}</a></li>`).join('')}</ol>`
+        : `<p class="lead">${st.n === 3 ? '설계할 시설을 고르세요' : '볼 장'}</p><ol class="todo">${chs.map((c) => `<li><a href="#/s/${c.id}"><span class="n">${esc(c.num)}</span><span class="t">${esc(c.title)}</span>${c.page ? `<span class="muted">p.${c.page}</span>` : ''}</a></li>`).join('') || '<li class="muted">—</li>'}</ol>`;
+      return `<li class="step${st.own ? '' : ' common'}"><details${open ? ' open' : ''}>
+        <summary><span class="dot">${st.n}</span><span class="h"><strong>${st.title}</strong><span class="muted">${st.own ? `제${vol}편 ${esc(v.name)}${chs[0] ? ` · ${esc(chs.map((c) => c.num).join('·'))}` : ''}` : st.src + ' (모든 사업 공통)'}</span></span><span class="muted cnt">${todo.length ? `할 일 ${todo.length}` : `장 ${chs.length}`}</span></summary>
+        <div class="sbody">
+          ${list}
+          ${flows.length ? `<p class="row"><span class="muted">흐름도</span>${flows.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.num)} ${esc(f.title)}</a>`).join('')}</p>` : ''}
+          ${report ? `<p class="row"><span class="muted">산출물</span><a class="out" href="#/s/${report.id}">${esc(report.title.replace(/\s*작성$/, ''))}</a></p>` : ''}
+          ${terms.length ? `<p class="row"><span class="muted">용어</span>${terms.map((g) => `<a class="tchip" href="#/terms?t=${termSlug(g.t)}">${esc(g.t)}</a>`).join('')}</p>` : ''}
+          ${facs.length ? `<p class="row"><span class="muted">시설정보</span>${facs.map(([k, label]) => `<a class="tchip fac" href="#/fac?t=${encodeURIComponent(k)}">${esc(label)} 찾기 →</a>`).join('')}</p>` : ''}
+        </div></details></li>`;
+    };
     const matrix = BIZ.map((vid) => {
       const st = flowSteps(vid);
       const vv = D.vols.find((x) => x.id === vid);
       const cell = (items) => items.map((c) => `<a href="#/s/${c.id}">${esc(c.title)}</a>`).join(' · ') || '<span class="muted">—</span>';
       return `<tr><th scope="row" style="background:#F8FAFC">${esc(vv.name)}</th><td>${cell(st[0].items)}</td><td>${cell(st[1].items)}</td><td>${cell(st[2].items)}</td></tr>`;
     }).join('');
-    return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main">
-      <h1 style="margin:0;font-size:1.75rem">업무 흐름으로 찾기</h1>
-      <p class="muted" style="margin:0">사업을 고르면 예정지 조사부터 설계서 작성까지 단계별로 볼 장을 보여줍니다.</p>
+    return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main flow-page">
+      <div class="pagehead"><h1>업무 흐름</h1><span class="muted">예정지 조사부터 설계서 작성까지 6단계</span></div>
       <div class="biz" role="group" aria-label="사업 유형">${BIZ.map((vid, i) => `<button type="button" aria-pressed="${i === bi}" data-act="biz" data-b="${i}">${esc(D.vols.find((x) => x.id === vid).name)}</button>`).join('')}</div>
-      <ol class="steps-grid">${steps.map((st) => `<li class="${st.own ? 'own' : 'common'}">
-        <span style="display:flex;align-items:center;gap:8px"><span class="n">${st.n}</span><strong>${st.title}</strong></span>
-        <span class="muted" style="font-size:.9375rem">${st.own ? `제${vol}편 ${esc(v.name)}` : st.src}</span>
-        ${st.items.map((c) => `<a href="#/s/${c.id}">${esc(c.num)} ${esc(c.title)}${c.page ? ` <span class="muted">p.${c.page}</span>` : ''}</a>`).join('') || '<span class="muted">—</span>'}
-      </li>`).join('')}</ol>
-      <p class="muted" style="margin:0;font-size:.9375rem">1~3단계는 사업별 편, 4~6단계는 모든 사업이 함께 쓰는 공통 편입니다.</p>
-      ${flows.length ? `<section class="card"><h2>이 사업의 흐름도·체계도</h2><div style="display:flex;flex-wrap:wrap;gap:8px">${flows.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.num)} ${esc(f.title)}</a>`).join('')}</div></section>` : ''}
-      <section><h2 style="font-size:1.1875rem">전체 보기 — 사업 × 단계</h2>
+      <ol class="stepper">${steps.map(stepHtml).join('')}</ol>
+      <p class="muted" style="margin:0;font-size:.9375rem">1~3단계는 사업별 편, 4~6단계는 모든 사업이 함께 쓰는 공통 편입니다. 단계를 누르면 펼쳐집니다.</p>
+      <section class="matrix"><h2 style="font-size:1.1875rem">한눈에 — 사업 × 단계</h2>
         <div class="tblwrap"><table class="data"><thead><tr><th scope="col">사업</th><th scope="col">1 예정지 조사</th><th scope="col">2 조사측량·현장조사</th><th scope="col">3 계획·시설 설계</th></tr></thead><tbody>${matrix}</tbody></table></div>
       </section>
-    </div></main>${bottomnav(null)}`;
+    </div></main>${bottomnav('flow')}`;
   }
 
   /* ---------------- 라우터 ---------------- */
@@ -1272,6 +1440,8 @@
       case 't': html = viewTable(parts[1], parts[2]); break;
       case 'tables': html = viewTables(params); break;
       case 'flow': html = viewFlow(params); break;
+      case 'terms': html = viewTerms(params); break;
+      case 'fac': html = viewFac(params); break;
       case 'saved': html = viewSaved(); break;
       default: html = viewHome();
     }
@@ -1320,6 +1490,10 @@
       if (ps && paneWanted() && canPane(ps)) openPane(ps, parts[0] === 't' ? ((ps.pdf_blocks && ps.pdf_blocks[+parts[2]]) || ps.pdf) : ps.pdf);
     }
     if (back) { window.scrollTo(0, restoreTo); setTimeout(() => window.scrollTo(0, restoreTo), 0); }   // 글꼴·표가 자리 잡은 뒤 한 번 더
+    else {   // 용어 사전 '#/terms?t=용어': 그 용어로
+      const fz = app.querySelector('[data-focus]');
+      if (fz) { fz.scrollIntoView({ block: 'start' }); window.scrollBy(0, -8); fz.classList.add('flash'); }
+    }
     const askMain = typeof hash !== 'string' && app.querySelector('main[data-ask]');
     if (askMain) startAsk(askMain);
   }
@@ -1427,6 +1601,14 @@
 
   /* ---------------- 이벤트 ---------------- */
   app.addEventListener('submit', (e) => {
+    const tf = e.target.closest('form[data-form="terms"], form[data-form="fac"]');
+    if (tf) {   // 용어 찾기·시설 찾기: 칸의 값으로 주소를 바꾼다
+      e.preventDefault();
+      const p = new URLSearchParams();
+      [...new FormData(tf).entries()].forEach(([k, val]) => { if (String(val).trim()) p.set(k, String(val).trim()); });
+      location.hash = `#/${tf.dataset.form}?${p}`;
+      return;
+    }
     const form = e.target.closest('form[data-form="search"]');
     if (!form) return;
     e.preventDefault();
@@ -1447,6 +1629,11 @@
       params.set('v', on.length === boxes.filter((b) => !b.disabled).length ? '' : on.join(','));
       params.delete('page');
       location.hash = `#/search?${params}`;
+    } else if (t.matches('[data-act="fac-sido"], [data-act="fac-sgg"]')) {
+      const f = t.form;
+      if (t.matches('[data-act="fac-sido"]')) f.sgg.value = '';
+      focusAfter = `[data-act="${t.dataset.act}"]`;
+      f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     } else if (t.matches('[data-act="vol"]')) {
       focusAfter = '#volsel';   // 키보드 ↑↓로 편을 넘길 때 초점이 제목으로 튀지 않게
       location.hash = `#/s/${t.value}-ch1`;
