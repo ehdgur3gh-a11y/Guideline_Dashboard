@@ -105,3 +105,23 @@ if (fs.existsSync(path.join(__dirname, '..', 'web', 'pdf', '4.pdf'))) {
   assert(!t('4-app-2.2'), '목록 항목이 절로 남음(4-app-2.2)');
   console.log('글자·목차 그림·제목 고침 OK');
 }
+
+// 검토 8차: 용어 사전·시설 자료
+{
+  require('../web/data/glossary.js');
+  const T = window.KRC_TERMS.terms;
+  assert(T.length >= 120, '용어 수 ' + T.length);
+  const pr = T.find((g) => g.t === '프린스');
+  assert(pr && pr.defs[0].id === '1-4.3.2', '프린스 정의 출처');
+  assert(!T.some((g) => /^(여기서|위 식에서|다만)/.test(g.t)), '수식 기호 설명이 용어로 들어감');
+  assert(T.every((g) => g.defs.every((d) => d.ext || D.vols.flatMap((v) => v.sections).some((s) => s.id === d.id))), '정의 출처 절이 없음');
+  require('../web/data/fac.js');
+  const F = window.KRC_FAC;
+  const res = F.types.find((t) => t.key === '저수지');
+  const yong = res.rows.find((r) => r[0] === '2671010056');
+  assert(yong && yong[1] === '용천' && yong[4] === '기장군', '용천 저수지');
+  assert.strictEqual(yong[10][res.cols.findIndex(([n]) => n === '유효저수량')], 115.29, '용천 유효저수량');
+  assert(F.types.reduce((n, t) => n + t.rows.length, 0) > 14000, '시설 수');
+  assert(!F.types.some((t) => t.rows.some((r) => r[3] === '광주광역시' || r[3] === '전라남도')), '옛 시도 이름이 남음');
+  console.log('용어 사전·시설 자료 OK');
+}

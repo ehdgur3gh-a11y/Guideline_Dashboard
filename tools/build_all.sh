@@ -12,6 +12,8 @@ if ls web/pdf/[0-9].pdf >/dev/null 2>&1; then "$PY" -I tools/pdf_pages.py "$PDF_
 elif [ -d "$PDF_DIR" ]; then "$PY" -I tools/pdf_pages.py "$PDF_DIR" data web | tail -1; fi
 if ls web/pdf/[0-9].pdf >/dev/null 2>&1; then "$PY" -I tools/pdf_images.py data web | tail -1; fi   # 원문 쪽 그림(이미 있는 쪽은 건너뜀)
 "$PY" -I tools/build_web_data.py data web
+node tools/build_glossary.js   # 용어 사전 (원문 정의 + RAWRIS 용어)
+if [ -d "#참고자료/시설제원" ]; then "$PY" -I tools/build_facilities.py "#참고자료/시설제원" web 2>/dev/null; fi   # 시설정보 (공공데이터포털 시설제원 CSV)
 "$PY" -I tools/subset_fonts.py tools/fonts-src data web
 node tests/search.test.js
 node tests/eq.test.js
