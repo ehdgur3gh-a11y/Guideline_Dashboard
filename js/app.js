@@ -627,12 +627,12 @@
     const shown = listHits.slice(0, page * perPage);
     const volBoxes = D.vols.map((v) => {
       const c = r.counts[v.id] || 0;
-      const checked = !vols.size || vols.has(v.id);
+      const checked = c > 0 && (!vols.size || vols.has(v.id));   // 0건인 편은 체크 없이 흐리게(눌린 것처럼 보이지 않게)
       return `<label><input type="checkbox" data-vol="${v.id}"${checked ? ' checked' : ''}${c ? '' : ' disabled'}> 제${v.id}편 ${v.name}<span class="c">${c}</span></label>`;
     }).join('');
     const notes = [`<span class="tag info">띄어쓰기·표기 차이 무시</span>`];
     if (r.synonyms.length) notes.push(`<span class="tag calc">동의어 포함: ${esc(r.synonyms.join(', '))}</span>`);
-    if (r.terms.length > 1 || r.terms.join('') !== q.trim()) notes.push(`<span class="tag info">찾은 키워드: ${esc(r.terms.join(', '))}</span>`);
+    if (r.terms.length && (r.terms.length > 1 || r.terms.join('') !== q.trim())) notes.push(`<span class="tag info">찾은 키워드: ${esc(r.terms.join(', '))}</span>`);
     // 폰: 안내는 한 줄, '편으로 좁히기'는 옆으로 미는 칩(한 편 고르기) — 결과가 첫 화면에 바로 보이게
     const sumLine = `<p class="sumline">‘${esc(q)}’ ${r.hits.length}개 절${r.synonyms.length ? ` · ‘${esc(r.synonyms.join(', '))}’도 함께 찾음` : ''}</p>`;
     const vHref = (id) => `#/search?${new URLSearchParams(Object.assign({ q }, scope !== 'all' ? { scope } : {}, id ? { v: String(id) } : {}))}`;
@@ -653,6 +653,20 @@
           ${snips}
         </div><button type="button" class="icon-btn" data-act="cite" data-id="${s.id}" aria-label="출처 복사" title="출처 복사">${I.copy}</button></li>`;
     }).join('');
+    // 시설 이름('용천저수지')이면 맨 위에 시설정보 카드 — 시설 자료(445KB)는 결과가 없거나 시설 종류 말이 들어 있을 때만 받는다
+    const wantFac = scope !== 'body' && (window.KRC_FAC || r.hits.length === 0 || FAC_WORD.test(q));
+    if (wantFac && !window.KRC_FAC) {
+      loadFac().then(() => {
+        const slot = app.querySelector('[data-slot="fachit"]');
+        if (slot && parseHash().params.get('q') === q) slot.outerHTML = facHitHtml(q);
+      }, () => { /* 못 받으면 카드 없이 */ });
+    }
+    const facSlot = wantFac ? (window.KRC_FAC ? facHitHtml(q) : '<div data-slot="fachit"></div>') : '';
+    const nothing = !r.hits.length && !numCards && !defHit;
+    const emptyHtml = `<section class="empty card noresult"><p class="big">실무요령 본문에서 ‘${esc(q)}’을(를) 찾지 못했습니다</p>
+        <p class="muted">이렇게 찾아보세요 — 짧은 낱말, 절 번호, 다른 표기</p>
+        <p class="ex">${['저수지', '물넘이', '여유고', '4.2.1'].map((x) => `<a class="tchip" href="#/search?q=${q2(x)}">${x}</a>`).join('')}</p>
+        <p class="go"><a href="#/terms?q=${q2(q)}">${I.book}용어 사전에서 찾기</a><a href="#/fac?q=${q2(q)}">${I.dam}시설정보에서 찾기</a><a href="#/s/1-ch1">${I.list}전체 목차</a></p></section>`;
     const more = listHits.length > shown.length ? `<a class="btn" style="align-self:center" href="#/search?${new URLSearchParams({ q, scope, v: [...vols].join(','), page: page + 1 })}">결과 더 보기 (${listHits.length - shown.length}개 남음)</a>` : '';
 
     return topbar(q, scope, null, resultTabs(q, 'search', r.hits.length, tables.length)) + `<main id="main" class="page">
@@ -661,8 +675,8 @@
         <h1 class="sr">‘${esc(q)}’ 검색 결과</h1>
         ${vchips}${sumLine}
         <div class="summary"><span class="muted">‘${esc(q)}’ <strong style="color:var(--ink)">${r.hits.length}개 절</strong> · ${r.total}문단</span>${notes.join('')}</div>
-        ${defHit ? defCard(defHit) : ''}${numCards}${titleCards}
-        ${items ? `<ol class="results">${items}</ol>${more}` : `<p class="empty card">찾는 내용이 없습니다. 다른 낱말이나 절 번호로 찾아보세요.</p>`}
+        ${facSlot}${defHit ? defCard(defHit) : ''}${numCards}${titleCards}
+        ${items ? `<ol class="results">${items}</ol>${more}` : nothing ? emptyHtml : ''}
       </div>
       <aside class="side">
         ${FEATURES.ask ? `<a class="card titlehit" style="background:var(--surface)" href="#/ask?q=${q2(q)}"><span class="k">${I.ask} 질문으로 찾기</span><span>${esc(q)}</span></a>` : ''}
@@ -713,7 +727,7 @@
         <a href="#/search?q=${q2(q)}">키워드 검색결과 전체 보기 →</a>
       </div>
       <aside class="side ev-side" aria-label="근거 원문">
-        <h2 style="margin:0;font-size:1.1875rem">근거 원문 <span class="muted" data-slot="evcount"></span></h2>
+        <h2 style="margin:0;font-size:1.25rem">근거 원문 <span class="muted" data-slot="evcount"></span></h2>
         <ol class="evidence" data-slot="evidence"><li class="card"><div class="sk" style="height:16px;width:70%"></div><div class="sk" style="height:16px;width:90%"></div></li></ol>
         <section class="card" data-slot="citebox" hidden><h2>출처 표기 (복사 형식)</h2><p style="margin:0;color:var(--ink-2);font-size:.9375rem" data-slot="cite"></p></section>
       </aside>
@@ -1005,8 +1019,7 @@
           <button type="button" class="btn outline" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>
           ${saveBtn(s)}
           ${pdfToggle(s, s.pdf)}
-          <button type="button" class="btn" data-act="link">${canShare() ? `${I.share}공유` : `${I.link}링크 복사`}</button>
-          <button type="button" class="btn" data-act="print">${I.print}인쇄</button>
+          <span class="rmenu-wrap tmore"><button type="button" class="btn" data-act="rmenu" aria-label="더 보기 (링크·인쇄)" aria-controls="tmenu" aria-expanded="false">${I.dots}</button><div class="rmenu" id="tmenu" aria-label="더 보기" hidden><button type="button" data-act="link">${canShare() ? `${I.share}공유` : `${I.link}링크 복사`}</button><button type="button" data-act="print">${I.print}인쇄</button></div></span>
           ${q ? `<span class="hitnav" data-q="${esc(q)}"><span>‘${esc(q)}’ <strong data-hitpos>0</strong> / <span data-hittotal>0</span></span><button type="button" data-act="hit-prev" aria-label="이전 일치 항목">${I.up}</button><button type="button" data-act="hit-next" aria-label="다음 일치 항목">${I.down}</button><button type="button" class="hit-off" data-act="hit-off" aria-label="찾은 말 표시 끄기">${I.x}</button></span>` : ''}
         </div>
         <div class="content">${s.blocks.length ? renderBlocks(s, alts) : (kids.length ? `<p class="muted">이 ${s.level === 1 ? '장' : '절'}은 아래 항목으로 이루어져 있습니다.</p><ul class="children">${kids.map((k) => `<li><a href="#/s/${k.id}">${numTag(k.num)}${esc(k.title)}<span class="muted" style="margin-left:auto">${k.page ? 'p.' + k.page : ''}</span></a></li>`).join('')}</ul>` : '<p class="muted">본문이 없습니다.</p>')}</div>
@@ -1178,11 +1191,11 @@
     const byVol = {};
     shown.forEach((t) => { (byVol[t.s.vol] = byVol[t.s.vol] || []).push(t); });
     const tabs = q ? resultTabs(q, 'tables', null, list.length) : '';
-    return topbar(q, 'table', 'tables', tabs) + `<main id="main" class="page"><div class="main">
+    return topbar(q, 'table', 'tables', tabs) + `<main id="main" class="page"><div class="main tables-page">
       <h1 style="margin:0;font-size:1.75rem">표 모음</h1>
       <p class="muted" style="margin:0">${q ? `제목에 ‘${esc(q)}’가 들어간 표 ${all.length}개` : `제목이 있는 표 ${all.length}개`}${list.length > shown.length ? ` (앞의 ${shown.length}개 표시 — 편을 고르면 모두 보입니다)` : ''}</p>
       ${chips}
-      ${Object.keys(byVol).map((vid) => `<section><h2 style="font-size:1.1875rem;margin:10px 0">제${vid}편 ${esc(D.vols.find((v) => v.id === +vid).name)}</h2><ul class="tbl-list">${byVol[vid].map((t) => `<li><a href="#/t/${t.s.id}/${t.bi}"><span>${alts.length ? S.highlight(t.caption, alts) : esc(t.caption)}</span><small>${esc(t.s.num)} ${esc(t.s.title)}${t.s.page ? ' · p.' + t.s.page : ''}</small></a></li>`).join('')}</ul></section>`).join('') || '<p class="empty card">해당하는 표가 없습니다.</p>'}
+      ${Object.keys(byVol).map((vid) => `<section><h2 style="font-size:1.25rem;margin:10px 0">제${vid}편 ${esc(D.vols.find((v) => v.id === +vid).name)}</h2><ul class="tbl-list">${byVol[vid].map((t) => `<li><a href="#/t/${t.s.id}/${t.bi}"><span>${alts.length ? S.highlight(t.caption, alts) : esc(t.caption)}</span><small>${esc(t.s.num)} ${esc(t.s.title)}${t.s.page ? ' · p.' + t.s.page : ''}</small></a></li>`).join('')}</ul></section>`).join('') || '<p class="empty card">해당하는 표가 없습니다.</p>'}
     </div></main>${bottomnav('tables')}`;
   }
   function tableToTSV(b) {
@@ -1243,7 +1256,7 @@
     if (d.ext === 'rawris') return `<a class="dsrc" href="${esc(window.KRC_TERMS.rawris)}" target="_blank" rel="noopener">RAWRIS 농업생산기반시설 용어 ↗</a>`;
     const s = idx.byId.get(d.id);
     if (!s) return '';
-    return `<a class="dsrc" href="#/s/${s.id}">제${s.vol}편 ${esc(volOf(s).name)} › ${esc([s.num, s.title].filter(Boolean).join(' '))}${s.page ? ' · p.' + s.page : ''} →</a>`;
+    return `<a class="dsrc" href="#/s/${s.id}">제${s.vol}편 ${esc(volOf(s).name)} › ${esc([s.num, s.title].filter(Boolean).join(' '))}${s.page ? ' · p.' + s.page : ''} →</a>`;   // 화살표만 다음 줄로 떨어지지 않게
   }
   /** 검색결과 맨 위 '용어 정의' 카드 */
   function defCard(g) {
@@ -1294,6 +1307,24 @@
     if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js'; sc.onload = res; sc.onerror = () => { facLoading = null; rej(); }; document.head.appendChild(sc); });
     return facLoading;
   }
+  const FAC_WORD = /저수지|양수장|배수장|양배수장|취입보|방조제|관정|집수암거|지구/;
+  // 검색어에서 시설 종류 말을 떼고 시설 이름과 맞춰 본다(이름이 같거나 그 이름으로 시작)
+  function facHitHtml(q) {
+    const F = window.KRC_FAC;
+    if (!F) return '';
+    const name = S.norm(q.replace(/\s*(양배수장|양수장|배수장|저수지|취입보|방조제|관정|집수암거|지구)\s*$/, ''));
+    if (name.length < 2) return '';
+    const hits = [];
+    F.types.forEach((t) => t.rows.forEach((r) => { const n = S.norm(r[1]); if (n === name || n.startsWith(name)) hits.push({ t, r, exact: n === name }); }));
+    if (!hits.length) return '';
+    const typeWord = (q.match(/(저수지|양수장|배수장|취입보|방조제|관정|집수암거)\s*$/) || [])[1];
+    const want = (h) => (typeWord ? (typeWord === h.t.key || (h.t.key === '양배수장' && /양수장|배수장/.test(typeWord)) ? 0 : 1) : 0);
+    hits.sort((a, b) => want(a) - want(b) || (b.exact - a.exact));
+    const first = hits[0];
+    const kind = (h) => (h.t.key === '양배수장' && h.r[7] && h.r[7] !== '미상' ? `${h.r[7]}장` : h.t.label);
+    const rows = hits.slice(0, 3).map((h) => `<a href="#/fac?${new URLSearchParams({ t: h.t.key, q: h.r[1], id: h.r[0] })}"><strong>${esc(h.r[1])}</strong> <span class="muted">${esc(kind(h))} · ${esc([h.r[3], h.r[4]].join(' '))}</span></a>`).join('');
+    return `<section class="card fachit"><p class="k">${I.dam}시설정보에서 찾음 · ${hits.length.toLocaleString('ko-KR')}곳</p>${rows}${hits.length > 3 ? `<a class="all" href="#/fac?${new URLSearchParams({ t: first.t.key, q: first.r[1] })}">시설정보에서 모두 보기 →</a>` : ''}</section>`;
+  }
   const FAC_KEY_STAT = { 저수지: '총저수량', 양배수장: '수혜면적', 취입보: '수혜면적', 방조제: '제체 길이', 관정: '일 양수량', 집수암거: '매설 길이' };
   const fmtNum = (v) => (typeof v === 'number' ? v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : esc(String(v)));
   function viewFac(params) {
@@ -1316,7 +1347,7 @@
         const box = app.querySelector('.facload');
         if (box) box.innerHTML = '<p>시설 자료를 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><button type="button" class="btn" data-act="fac-retry">다시 시도</button>';
       });
-      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main"><h1 style="margin:0;font-size:1.75rem">시설정보</h1><div class="facload boot" role="status">시설 자료를 불러오는 중…</div></div></main>${bottomnav('fac')}`;
+      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page"><h1 style="margin:0;font-size:1.75rem">시설정보</h1><div class="facload boot" role="status">시설 자료를 불러오는 중…</div></div></main>${bottomnav('fac')}`;
     }
     const F = window.KRC_FAC;
     const type = F.types.find((t) => t.key === params.get('t')) || F.types[0];
@@ -1359,7 +1390,7 @@
     };
     return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page">
       <div class="pagehead"><h1>시설정보</h1><span class="muted">농업생산기반시설 · 공사 관리 ${F.types.reduce((n, t) => n + t.rows.length, 0).toLocaleString('ko-KR')}곳</span></div>
-      <details class="present"${wide(700) ? ' open' : ''}><summary>전국 ${P.total[0].toLocaleString('ko-KR')}곳 · 시설별 현황 <small>(통계연보 2024)</small></summary>
+      <details class="present"><summary>전국 ${P.total[0].toLocaleString('ko-KR')}곳 · 시설별 현황 <small>(통계연보 2024)</small></summary>
       <nav class="chips present" aria-label="전국 현황 (통계연보 2024)"><span class="tot">전국 <strong>${P.total[0].toLocaleString('ko-KR')}</strong></span>${P.rows.map(([n, all, krc]) => `<span>${esc(n)} <strong>${all.toLocaleString('ko-KR')}</strong><small>공사 ${krc.toLocaleString('ko-KR')}</small></span>`).join('')}</nav></details>
       <form class="facform" data-form="fac" role="search" aria-label="시설 찾기">
         <input type="hidden" name="t" value="${esc(type.key)}">${sub ? `<input type="hidden" name="sub" value="${esc(sub)}">` : ''}
@@ -1469,7 +1500,7 @@
       const st = flowSteps(vid);
       const vv = D.vols.find((x) => x.id === vid);
       const cell = (items) => items.map((c) => `<a href="#/s/${c.id}">${esc(c.title)}</a>`).join(' · ') || '<span class="muted">—</span>';
-      return `<tr><th scope="row" style="background:#F8FAFC">${esc(vv.name)}</th><td>${cell(st[0].items)}</td><td>${cell(st[1].items)}</td><td>${cell(st[2].items)}</td></tr>`;
+      return `<tr><th scope="row" style="background:var(--surface-2)">${esc(vv.name)}</th><td>${cell(st[0].items)}</td><td>${cell(st[1].items)}</td><td>${cell(st[2].items)}</td></tr>`;
     }).join('');
     return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main flow-page">
       <div class="pagehead"><h1>업무 흐름</h1><span class="muted">예정지 조사부터 설계서 작성까지 6단계</span></div>
