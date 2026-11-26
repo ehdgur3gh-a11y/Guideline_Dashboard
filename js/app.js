@@ -219,7 +219,8 @@
   }
   /* 원문 창 폭 — 기본은 '쪽 하나가 창 높이에 통째로 들어가는 가장 큰 폭', 왼쪽 가장자리를 끌면 바꾸고 기억(두 번 누르면 기본) */
   const PANE_MIN = 300;
-  const paneMax = () => Math.round(window.innerWidth * 0.6);
+  // 원문 창 최대 폭: 화면의 60%이되, 목차·여백(약 330px)과 본문(최소 560px)이 들어갈 자리는 남긴다 — 1100~1400px 노트북에서 본문이 폰보다 좁아지지 않게
+  const paneMax = () => Math.max(PANE_MIN, Math.min(Math.round(window.innerWidth * 0.6), window.innerWidth - 330 - 560));
   function paneFitWidth() {
     const el = paneEl();
     const im = volOf(pane.s).pdf_img;
@@ -1298,7 +1299,19 @@
   function viewFac(params) {
     document.title = '시설정보 — 조사설계실무요령';
     if (!window.KRC_FAC) {
-      const done = () => { if (parseHash().parts[0] !== 'fac') return; render(location.hash); const h = app.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } };
+      const done = () => {
+        if (parseHash().parts[0] !== 'fac') return;
+        const ae = document.activeElement;
+        if (ae && ae.matches && ae.matches('input, textarea, select') && app.querySelector('main')) {   // 위 검색칸에 쓰는 중이면 본문만 바꾼다(글·자판 유지)
+          const tmp = document.createElement('div');
+          tmp.innerHTML = viewFac(parseHash().params);
+          const nm = tmp.querySelector('main');
+          if (nm) app.querySelector('main').replaceWith(nm);
+          return;
+        }
+        render(location.hash);
+        const h = app.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+      };
       loadFac().then(done, () => {   // 받지 못하면(오프라인 등) 멈춰 있지 않고 알리고 다시 시도
         const box = app.querySelector('.facload');
         if (box) box.innerHTML = '<p>시설 자료를 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><button type="button" class="btn" data-act="fac-retry">다시 시도</button>';
@@ -1355,10 +1368,15 @@
           <label><span class="sr">시군구</span><select name="sgg" data-act="fac-sgg"${sido ? '' : ' disabled'}><option value="">시군구 전체</option>${sggs.map((x) => `<option${x === sgg ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
         </div>
       </form>
-      <nav class="chips" aria-label="시설 구분">${F.types.map((t) => `<a href="${link({ t: t.key })}"${t === type ? ' aria-current="true"' : ''}>${esc(t.label)} <span>${(sido || sgg || q ? t.rows.filter(hit).length : t.rows.length).toLocaleString('ko-KR')}</span></a>`).join('')}</nav>
+      <nav class="chips" aria-label="시설 구분">${F.types.map((t) => {
+        // 그 종류에 없는 시군구는 칩 숫자와 링크에서 뺀다(눌렀을 때 숫자와 목록이 같게)
+        const tSgg = sgg && t.rows.some((r) => r[3] === sido && r[4] === sgg) ? sgg : '';
+        const n = sido || sgg || q ? t.rows.filter((r) => (!sido || r[3] === sido) && (!tSgg || r[4] === tSgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq) || S.norm(r[3] + r[4]).includes(nq))).length : t.rows.length;
+        return `<a href="${link(Object.assign({ t: t.key }, tSgg ? {} : { sgg: '' }))}"${t === type ? ' aria-current="true"' : ''}>${esc(t.label)} <span>${n.toLocaleString('ko-KR')}</span></a>`;
+      }).join('')}</nav>
       ${type.key === '양배수장' ? `<nav class="chips" aria-label="양수·배수">${[['', '전체'], ['양수', '양수장'], ['배수', '배수장']].map(([k, l]) => `<a href="${link({ sub: k })}"${sub === k ? ' aria-current="true"' : ''}>${l}</a>`).join('')}</nav>` : ''}
       <p class="muted" style="margin:0">${esc([sido, sgg].filter(Boolean).join(' ') || '전국')} ${esc(type.label)} <strong style="color:var(--ink)">${rows.length.toLocaleString('ko-KR')}곳</strong>${q ? ` · ‘${esc(q)}’` : ''}</p>
-      ${rows.length ? `<ol class="faclist">${shown.map(card).join('')}</ol>${rows.length > shown.length ? `<a class="btn" style="align-self:center" href="${link({ page: page + 1 })}">더 보기 (${(rows.length - shown.length).toLocaleString('ko-KR')}곳 남음)</a>` : ''}` : '<p class="empty card">해당하는 시설이 없습니다. 시군 관리 시설은 RAWRIS에서 찾아보세요.</p>'}
+      ${rows.length ? `<ol class="faclist">${shown.map(card).join('')}</ol>${rows.length > shown.length ? `<a class="btn" style="align-self:center" href="${link({ page: page + 1 })}" data-act="fac-more">더 보기 (${(rows.length - shown.length).toLocaleString('ko-KR')}곳 남음)</a>` : ''}` : '<p class="empty card">해당하는 시설이 없습니다. 시군 관리 시설은 RAWRIS에서 찾아보세요.</p>'}
       <p class="muted" style="font-size:.875rem;margin:0">자료: ${esc(F.source)} — 공사가 관리하는 시설만 들어 있습니다(시군 관리 ${P.total[2].toLocaleString('ko-KR')}곳은 <a href="https://rawris.ekr.or.kr/selectFacList.do" target="_blank" rel="noopener">RAWRIS 시설 검색 ↗</a>). 현황: ${esc(P.source)}.</p>
     </div></main>${bottomnav('fac')}`;
   }
@@ -1401,10 +1419,15 @@
     const flowCharts = (secs) => {
       const out = [], seen = new Set();
       secs.forEach((x) => {
-        if (/흐름도|체계도/.test(x.title)) { out.push({ id: x.id, label: `${x.num} ${x.title}` }); seen.add(x.id); }
+        if (/흐름도|체계도/.test(x.title)) {
+          // '7.1.1 흐름도'처럼 제목만으로는 무엇의 흐름도인지 모르면 위 절 제목을 붙인다
+          let label = `${x.num} ${x.title}`;
+          if (x.title.replace(/\s/g, '').length <= 6) { const vv = volOf(x); for (let i = x.order - 1; i >= 0; i--) if (vv.sections[i].level < x.level && !/^개요$/.test(vv.sections[i].title)) { label = `${x.num} ${vv.sections[i].title.replace(/^제\d+장\s*/, '')} ${x.title}`; break; } }
+          out.push({ id: x.id, label }); seen.add(x.id);
+        }
         if (!seen.has(x.id)) x.blocks.forEach((b) => {   // 제목이 흐름도인 절은 그 안의 같은 그림을 또 싣지 않는다
           const cap = (b.t === 'p' ? b.text : b.t === 'table' ? b.caption || '' : '').trim();
-          if (/^\[그림[^\]]*\]/.test(cap) && /흐름도|체계도|흐름$/.test(cap) && cap.length < 70 && !seen.has(x.id + cap)) { out.push({ id: x.id, label: cap.replace(/^\[그림\s*/, '[').replace(/\s+/g, ' ') }); seen.add(x.id + cap); }
+          if (/^\[그림[^\]]*\]/.test(cap) && /흐름도|체계도|흐름$/.test(cap) && cap.length < 70 && !seen.has(x.id + cap)) { out.push({ id: x.id, label: cap.replace(/^\[그림[\s.]*/, '[').replace(/\s+/g, ' ') }); seen.add(x.id + cap); }
         });
       });
       return out;
@@ -1470,6 +1493,7 @@
   let entrySeq = Date.now();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   let lastSearchKey = null;
+  let lastPage = 1;   // 같은 검색에서 '더 보기'(쪽 늘림)일 때만 새로 나온 첫 항목으로 초점
   let curDepth = 0;   // 이 사이트 안에서 몇 번째 화면인지(기록마다 저장) — 폰 머리줄 '←'가 사이트 밖으로 나가지 않게
   let focusAfter = null;   // 다시 그린 뒤 초점을 둘 곳(편 고르기·사업 단추)
   function render(hash) {
@@ -1511,8 +1535,10 @@
       filt: !!app.querySelector('.filters details[open]'),
       vol: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.vol : null,
       count: app.querySelectorAll('ol.results > li, .faclist > li').length,
+      more: (parseInt(params.get('page'), 10) || 1) > lastPage,
     } : null;
     lastSearchKey = searchKey;
+    lastPage = parseInt(params.get('page'), 10) || 1;
     app.innerHTML = html;
     if (keep && keep.filt) { const d = app.querySelector('.filters details'); if (d) d.open = true; }
     window.scrollTo(0, keep ? keep.y : 0);
@@ -1523,7 +1549,8 @@
       let after = focusAfter && app.querySelector(focusAfter);
       if (after && after.offsetParent === null) after = null;   // 숨은 칸(폰의 목차 등)이면 제목으로
       focusAfter = null;
-      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a, .faclist > li:nth-child(${keep.count + 1}) summary`));
+      // 편 칩·필터를 바꾼 경우는 고른 칩에, '더 보기'면 새로 나온 첫 항목에
+      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : keep.more ? app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a, .faclist > li:nth-child(${keep.count + 1}) summary`) : app.querySelector('.vchips [aria-current], .chips [aria-current]'));
       const h1 = app.querySelector('h1');
       if (next) next.focus({ preventScroll: true });
       else if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
@@ -1703,7 +1730,11 @@
       changed = true;
     } else if (parts[0] === 'fac' && d.closest && d.closest('.faclist')) {
       const code = d.querySelector('.fbody .muted:last-child')?.textContent.match(/표준코드 (\S+)/);
-      if (d.open && code) params.set('id', code[1]); else if (!d.open) params.delete('id');
+      if (d.open && code) params.set('id', code[1]);
+      else if (!d.open && code && params.get('id') === code[1]) {   // 닫은 카드가 주소의 그 카드일 때만 — 다른 카드가 열려 있으면 그것으로
+        const other = [...app.querySelectorAll('.faclist details[open] .fbody .muted:last-child')].map((x) => (x.textContent.match(/표준코드 (\S+)/) || [])[1]).filter(Boolean)[0];
+        if (other) params.set('id', other); else params.delete('id');
+      }
       changed = true;
     }
     if (changed) { try { history.replaceState(history.state, '', `#/${parts.join('/')}?${params}`); } catch (err) { /* 무시 */ } }
@@ -1711,7 +1742,8 @@
   // ⋯ 메뉴: 초점이 메뉴 밖으로 나가면 닫는다(Tab으로 빠져나갈 때)
   app.addEventListener('focusout', (e) => {
     const w = e.target.closest && e.target.closest('.rmenu-wrap');
-    if (w && !w.contains(e.relatedTarget)) { const m = w.querySelector('.rmenu'); if (m && !m.hidden) closeMenu(); }
+    // relatedTarget이 없으면(사파리는 누른 단추에 초점을 주지 않는다) 닫지 않는다 — 바깥 누르기·Esc로 닫힘
+    if (w && e.relatedTarget && !w.contains(e.relatedTarget)) { const m = w.querySelector('.rmenu'); if (m && !m.hidden) closeMenu(); }
   });
   app.addEventListener('input', (e) => {
     if (!e.target.matches('[data-act="tfilter"]')) return;
@@ -1765,7 +1797,14 @@
       return;
     }
     if (act === 'linkcopy') { copyText(location.href, '링크를 복사했습니다'); return; }
-    if (act === 'fac-retry') { facLoading = null; render(location.hash); return; }
+    if (act === 'fac-retry') { facLoading = null; render(location.hash); const b = app.querySelector('.facload'); if (b) { b.setAttribute('tabindex', '-1'); b.focus(); } return; }
+    if (act === 'fac-more') {   // 펴 둔 카드(주소의 id)를 그대로 두고 다음 50곳
+      e.preventDefault();
+      const { params } = parseHash();
+      params.set('page', (parseInt(params.get('page'), 10) || 1) + 1);
+      location.hash = `#/fac?${params}`;
+      return;
+    }
     if (act === 'hit-off') {   // 찾은 말 강조와 이동 막대를 걷는다(주소에서도 검색어를 뺀다)
       app.querySelectorAll('.content mark').forEach((m) => m.replaceWith(document.createTextNode(m.textContent)));
       const nav = app.querySelector('.hitnav'); if (nav) nav.remove();
@@ -1823,7 +1862,7 @@
     }
     if (act === 'recent-clear') {
       store.set('krc.recent', '');
-      if (parseHash().parts[0] === 'saved') render('#/saved');
+      if (parseHash().parts[0] === 'saved') { render('#/saved'); const h = app.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); } }
       else { const sec = app.querySelector('.recent'); if (sec) sec.remove(); }
       toast('최근 본 절을 지웠습니다');
       return;
@@ -1909,6 +1948,7 @@
     } else if (act === 'hit-prev' || act === 'hit-next') {
       moveHit(act === 'hit-next' ? 1 : -1);
     } else if (act === 'biz') {
+      if (el.getAttribute('aria-pressed') === 'true') return;   // 이미 고른 사업: 다시 그리지 않는다(펼친 단계 유지)
       focusAfter = `[data-act="biz"][data-b="${el.dataset.b}"]`;   // 다시 그린 뒤에도 고른 단추에 초점
       location.hash = `#/flow?b=${el.dataset.b}`;
     } else if (act === 'ev') {
