@@ -94,8 +94,13 @@
   const SCRIPT_CH = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁺': '+', '⁻': '-', '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
   const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '').replace(/[⁰¹²³⁴-⁹⁺⁻₀-₉]/g, (c) => SCRIPT_CH[c]);
   const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 글자 하나의 정규식: 숫자는 위·아래첨자 꼴도 ('m3' → m[3³₃]) — 찾기는 norm으로 맞추므로 강조도 같은 규칙이어야 한다
+  const SCRIPT_OF = {};
+  for (const [k, v] of Object.entries(SCRIPT_CH)) (SCRIPT_OF[v] = SCRIPT_OF[v] || []).push(k);
+  const charRe = (ch) => (SCRIPT_OF[ch] ? `[${[ch, ...SCRIPT_OF[ch]].map(escapeRe).join('')}]` : escapeRe(ch));
+  const termRe = (term) => Array.from(norm(term)).map(charRe).join('\\s*');
   /** 띄어쓰기가 끼어 있어도 맞도록: '여유고' → /여\s*유\s*고/ */
-  const looseRe = (term) => new RegExp(Array.from(norm(term)).map(escapeRe).join('\\s*'), 'gi');
+  const looseRe = (term) => new RegExp(termRe(term), 'gi');
 
   // 한 글자 낱말 뒤에서도 떼어도 되는 분명한 조사 ('폭과' → '폭'). '이'·'가'는 '높이'처럼 낱말의 일부일 수 있어 제외
   const CLEAR_JOSA = new Set(['과', '와', '은', '는', '을', '를', '의', '에', '도']);
@@ -207,7 +212,8 @@
       const v = this.vols.find((x) => x.id === s.vol);
       const parts = [`제${s.vol}편 ${s.volName}`];
       const ch = v.sections.find((x) => x.level === 1 && x.chapter === s.chapter && x.order <= s.order);
-      if (ch && ch !== s) parts.push(`제${ch.chapter}장 ${ch.title}`);
+      // 부록('app')·참고문헌('ref')은 장 번호가 없으므로 제목만
+      if (ch && ch !== s) parts.push(typeof ch.chapter === 'number' ? `제${ch.chapter}장 ${ch.title}` : ch.title);
       if (s.level === 3) {
         const pnum = s.num.split('.').slice(0, 2).join('.');
         for (let i = s.order - 1; i >= 0; i--) {
@@ -239,7 +245,9 @@
         if (numHit ? norm(s.num).startsWith(n) : s.normTitle.includes(n)) list.push(s);
         if (list.length >= 40) break;
       }
-      list.sort((a, b) => (a.normTitle.indexOf(n) - b.normTitle.indexOf(n)) || (a.level - b.level) || (a.vol - b.vol));
+      // 부록(사례)·참고문헌 절은 본문 절 뒤로 — '배수문'을 치면 제4편 부록의 영산강 사례보다 본문 설계 절이 먼저
+      const side = (s) => (typeof s.chapter === 'number' ? 0 : 1);
+      list.sort((a, b) => (side(a) - side(b)) || (a.normTitle.indexOf(n) - b.normTitle.indexOf(n)) || (a.level - b.level) || (a.vol - b.vol));
       let synonym = null;
       for (const g of SYNONYMS) {
         // 낱말을 다 쳤거나 3글자 이상 쳤을 때만 — '양수'에 '양수량' 동의어를, '여'에 '여수토' 동의어를 띄우면 헷갈린다
@@ -275,6 +283,7 @@
         groups.push(g);
       }
       const volFilter = opts.vols && opts.vols.size ? opts.vols : null;
+      const bodyOnly = opts.scope === 'body';   // 검색 범위 '본문': 제목·경로 가중치 없이 본문 글만
       const N = this.sections.length;
       const k1 = 1.2, b = 0.75;
       const G = groups.map((g, gi) => {
@@ -303,8 +312,8 @@
         let score = 0, matchedIdf = 0, informativeHit = false, titleAll = G.length > 0;
         const paraScore = new Map();
         for (const g of G) {
-          const inTitle = g.nalts.some((a) => s.normTitle.includes(a));
-          const inPath = g.nalts.some((a) => s.normPath.includes(a));
+          const inTitle = !bodyOnly && g.nalts.some((a) => s.normTitle.includes(a));
+          const inPath = !bodyOnly && g.nalts.some((a) => s.normPath.includes(a));
           const tf = g.nalts.reduce((m, a) => Math.max(m, countIn(s.normBody, a)), 0);
           titleAll = titleAll && inTitle;
           if (!tf && !inTitle) continue;
@@ -363,13 +372,20 @@
 
   const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  /** 안전하게 이스케이프한 뒤 검색어를 <mark>로 감싼다 */
+  /** 검색어를 <mark>로 감싸고 나머지는 이스케이프한다.
+   *  원래 글에서 찾은 뒤 조각마다 이스케이프 — 이스케이프한 뒤 찾으면 't'가 '&lt;' 안을 맞혀 '&l<mark>t</mark>;'처럼 깨진다 */
   function highlight(text, alts) {
-    const html = escapeHtml(text);
+    text = text || '';
     const terms = (alts || []).filter((a) => norm(a).length > 0).sort((a, b) => norm(b).length - norm(a).length);
-    if (!terms.length) return html;
-    const re = new RegExp(terms.map((t) => Array.from(norm(t)).map((ch) => escapeRe(escapeHtml(ch))).join('\\s*')).join('|'), 'gi');
-    return html.replace(re, (m) => `<mark>${m}</mark>`);
+    if (!terms.length) return escapeHtml(text);
+    const re = new RegExp(terms.map(termRe).join('|'), 'gi');
+    let out = '', last = 0, m;
+    while ((m = re.exec(text))) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      out += escapeHtml(text.slice(last, m.index)) + `<mark>${escapeHtml(m[0])}</mark>`;
+      last = m.index + m[0].length;
+    }
+    return out + escapeHtml(text.slice(last));
   }
 
   /** 문단·셀의 글: 수식은 HWP 수식 스크립트 대신 읽을 수 있는 한 줄 글로 ('I over2' → 'I/2'). eq.js가 없으면 원래 글 */

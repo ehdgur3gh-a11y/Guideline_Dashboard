@@ -37,3 +37,18 @@ for (const q of ['펌프용량', '양수장 펌프 용량', '펌프 용량은?']
 // 뜻이 둘인 낱말은 사전에 넣지 않는다 (수문=水門·水文, 제정=堤頂·制定, 정지=整地·停止)
 for (const g of KRCSearch.SYNONYMS) for (const w of ['수문', '제정', '정지']) assert(!g.includes(w), '모호한 동의어: ' + w);
 console.log('동의어 지킴이 OK');
+
+// 강조: 짧은 검색어가 이스케이프한 기호('&lt;' 안의 t) 속을 맞혀 글이 깨지면 안 된다 · 위첨자 단위(m³)도 강조
+{
+  const H = KRCSearch.highlight;
+  assert.strictEqual(H('A < B "q" t', ['t']), 'A &lt; B &quot;q&quot; <mark>t</mark>', '강조가 기호를 깨뜨림');
+  assert.strictEqual(H("Con'c 39", ['39']), 'Con&#39;c <mark>39</mark>', '강조가 &#39;를 깨뜨림');
+  assert.strictEqual(H('부피 m³', ['m3']), '부피 <mark>m³</mark>', 'm3로 m³ 강조');
+  assert.strictEqual(H('<b>x</b>', []), '&lt;b&gt;x&lt;/b&gt;', '강조 없을 때도 이스케이프');
+  // 본문 범위: 제목 일치 카드가 없어야 한다
+  assert.strictEqual(idx.search('여유고', { scope: 'body' }).titleHits.length, 0, '본문 범위인데 제목 일치');
+  // 자동완성: 부록(사례) 절은 본문 절 뒤로
+  const sg = idx.suggest('배수문', 6).sections;
+  assert(sg.length && typeof sg[0].chapter === 'number', '자동완성 첫 항목이 부록: ' + sg[0].id);
+  console.log('강조·본문 범위·자동완성 순서 OK');
+}
