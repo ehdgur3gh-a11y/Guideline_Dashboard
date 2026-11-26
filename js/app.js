@@ -1305,7 +1305,7 @@
   let facLoading = null;
   function loadFac() {
     if (window.KRC_FAC) return Promise.resolve();
-    if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js'; sc.onload = res; sc.onerror = () => { facLoading = null; rej(); }; document.head.appendChild(sc); });
+    if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js?v=e6b59303fe'; sc.onload = res; sc.onerror = () => { facLoading = null; rej(); }; document.head.appendChild(sc); });
     return facLoading;
   }
   const FAC_WORD = /저수지|양수장|배수장|양배수장|취입보|방조제|관정|집수암거|지구/;
