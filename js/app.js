@@ -204,6 +204,7 @@
     requestAnimationFrame(() => paneScrollTo(f));   // 그림 자리 높이가 잡힌 뒤 한 번 더
     setToggle(true);
     if (modal) { pushLayer('pane'); el.querySelector('[data-act="pp-close"]').focus(); }
+    requestAnimationFrame(markWide);   // 본문 폭이 줄었으니 '옆으로 밀어 보세요' 안내를 다시
   }
   /* 원문 창 폭 — 기본은 '쪽 하나가 창 높이에 통째로 들어가는 가장 큰 폭', 왼쪽 가장자리를 끌면 바꾸고 기억(두 번 누르면 기본) */
   const PANE_MIN = 300;
@@ -231,7 +232,21 @@
     if (h) { h.setAttribute('aria-valuenow', String(w)); h.setAttribute('aria-valuemax', String(paneMax())); }
   }
   let resizeTimer;
-  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(paneApplyWidth, 120); });
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { paneModeSync(); paneApplyWidth(); }, 120); });
+  /* 창 크기가 1100px를 넘나들면(창 줄이기, 태블릿 돌리기) 원문 창 방식도 맞춘다.
+     옆 창 → 좁아짐: 전체 화면으로 덮지 않고 닫는다(단추로 다시 연다). 전체 화면 → 넓어짐: 옆 창으로 다시 연다. */
+  function paneModeSync() {
+    const el = paneEl();
+    if (!el || detailEl()) return;
+    const wasModal = el.getAttribute('role') === 'dialog';
+    const nowModal = !wide(1100);
+    if (wasModal === nowModal) return;
+    const { s, cur } = pane;
+    closePane(true);
+    if (nowModal) { setToggle(false); return; }
+    dropLayer('pane');
+    openPane(s, cur);
+  }
   function paneResizeStart(e) {
     const el = paneEl();
     if (!el || e.button !== 0) return;
@@ -249,6 +264,7 @@
       handle.removeEventListener('pointermove', move);
       document.documentElement.classList.remove('pp-resizing');
       store.set('krc.pdfpaneW', String(Math.round(el.getBoundingClientRect().width)));
+      markWide();
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up, { once: true });
@@ -318,7 +334,7 @@
           <button type="button" class="icon-btn" data-act="pz-next" aria-label="다음 쪽">›</button>
           <button type="button" class="icon-btn" data-act="pz-out" aria-label="작게">−</button>
           <button type="button" class="icon-btn" data-act="pz-in" aria-label="크게">+</button>
-          <a class="btn pz-pdf" target="_blank" rel="noopener" title="원문 PDF를 새 창에서 엽니다">PDF로 열기</a>
+          <a class="btn pz-pdf" target="_blank" rel="noopener" title="원문 PDF를 새 창에서 엽니다" aria-label="PDF로 열기">PDF<span class="pz-pdf-l">로 열기</span></a>
           <button type="button" class="icon-btn" data-act="pz-close" aria-label="크게 보기 닫기">✕</button>
         </span>
       </div>
@@ -356,6 +372,7 @@
     const main = app.querySelector('main.page');
     if (main) main.classList.remove('with-pdf');
     document.documentElement.classList.remove('pdf-modal');
+    requestAnimationFrame(markWide);
     if (!quiet) {
       setToggle(false);
       const t = app.querySelector('[data-act="pdf-toggle"]');
@@ -460,7 +477,7 @@
   const scaleBtn = `<button type="button" class="btn" data-act="scale">${I.text}글자 크기</button>`;
   const scaleBtnM = `<button type="button" class="icon-btn scale-m" data-act="scale" aria-label="글자 크기" title="글자 크기">${I.text}</button>`;   // 폰 전용
   function topbar(q, scope, active, tabs) {
-    const nav = (href, label, key) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`;
+    const nav = (href, label, key) => `<a href="${href}"${active === key ? ` aria-current="${key === 'toc' ? 'true' : 'page'}"` : ''}>${label}</a>`;   // 목차 링크는 제1편으로 가므로 다른 절에서는 'page'가 아니다
     return `<header class="topbar"><div class="in">
       <a class="brand" href="#/">조사설계실무요령</a>${scaleBtnM}
       ${searchForm(q, scope, false)}
@@ -468,8 +485,9 @@
     </div>${tabs || ''}</header>`;
   }
   function bottomnav(active) {
-    const a = (href, icon, label, key) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${icon}${label}</a>`;
-    return `<nav class="bottomnav" aria-label="하단 메뉴">${a('#/', I.search.replace('20', '22').replace('20', '22'), '검색', 'home')}${a('#/flow', I.flow, '업무 흐름', 'flow')}${a('#/tables', I.table, '표 모음', 'tables')}${a('#/s/1-ch1', I.list, '목차', 'toc')}</nav>`;
+    const a = (href, icon, label, key, extra = '') => `<a href="${href}"${active === key ? ` aria-current="${key === 'toc' ? 'true' : 'page'}"` : ''}${extra}>${icon}${label}</a>`;
+    // 목차: 본문을 읽는 중이면 제1편 첫 장으로 가 버리지 않고 지금 편의 목차를 펼쳐 현재 절로 데려간다
+    return `<nav class="bottomnav" aria-label="하단 메뉴">${a('#/', I.search.replace('20', '22').replace('20', '22'), '검색', 'home')}${a('#/flow', I.flow, '업무 흐름', 'flow')}${a('#/tables', I.table, '표 모음', 'tables')}${a('#/s/1-ch1', I.list, '목차', 'toc', ' data-act="toc-jump"')}</nav>`;
   }
   function resultTabs(q, active, nResults, nTables) {
     const t = (href, label, key) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`;
@@ -543,15 +561,15 @@
   function viewSearch(params) {
     const q = params.get('q') || '';
     const scope = params.get('scope') || 'all';
-    const page = +(params.get('page') || 1);
+    const page = Math.max(1, parseInt(params.get('page'), 10) || 1);   // 'page=x' 같은 잘못된 값은 1쪽
     const vols = new Set((params.get('v') || '').split(',').filter(Boolean).map(Number));
     document.title = `‘${q}’ 검색 — 조사설계실무요령`;
     if (!q.trim()) return topbar('', scope, null, '') + `<main id="main" class="page"><div class="main"><p class="empty">검색어를 입력하세요.</p></div></main>${bottomnav('home')}`;
 
     if (scope === 'title') return viewTitleSearch(q, scope);
-    const r = idx.search(q, { vols });
+    const r = idx.search(q, { vols, scope });
     const tables = tablesMatching(q).list;
-    const numHits = idx.byNumber(q, vols.size ? vols : null);
+    const numHits = scope === 'body' ? [] : idx.byNumber(q, vols.size ? vols : null);
     const perPage = 20;
     const listHits = r.hits.filter((hit) => !r.titleHits.includes(hit.s));   // 위 '제목 일치' 카드와 겹치지 않게
     const shown = listHits.slice(0, page * perPage);
@@ -570,7 +588,7 @@
       const s = hit.s;
       const snips = idx.snippets(hit, r.alts, 2).map((x) => `<span class="snip">${x.kind === 'table' || x.kind === 'cap' ? '<span class="k">[표]</span>' : ''}${x.html}</span>`).join('');
       return `<li><div class="body">
-          <span class="path">${esc(idx.path(s).slice(0, -1).join(' › ') || idx.path(s)[0])}${s.page ? ' · p.' + s.page : ''}</span>
+          <span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span>
           <span class="ttl">${numTag(s.num)}<a href="#/s/${s.id}?q=${q2(q)}">${S.highlight(s.title, r.alts)}</a></span>
           ${snips}
         </div><button type="button" class="icon-btn" data-act="cite" data-id="${s.id}" aria-label="출처 복사" title="출처 복사">${I.copy}</button></li>`;
@@ -872,7 +890,7 @@
   }
   function viewReader(id, params) {
     const s = idx.byId.get(id);
-    if (!s) return topbar('', 'all', 'toc') + `<main id="main" class="page"><p class="empty card">해당 절을 찾을 수 없습니다.</p></main>${bottomnav('toc')}`;
+    if (!s) return topbar('', 'all', 'toc') + `<main id="main" class="page"><div class="empty card"><p>해당 절을 찾을 수 없습니다. 주소가 바뀌었거나 잘못 입력되었을 수 있습니다.</p><p><a href="#/s/1-ch1">전체 목차 보기</a> · <a href="#/">처음으로</a></p></div></main>${bottomnav('toc')}`;
     const v = volOf(s);
     const q = params.get('q') || '';
     const alts = q ? idx.search(q).alts : [];
@@ -898,15 +916,15 @@
         <ul>${tocItems}</ul>
       </details></nav>
       <article class="article">
-        <p class="path" style="margin:0">${esc(path.slice(0, -1).join(' › ') || path[0])}</p>
-        <h1>${numTag(s.num)}${esc(s.title)}</h1>
+        <p class="path" style="margin:0">${esc(path.join(' › '))}</p>
+        <h1>${numTag(s.num)}<span class="tt">${esc(s.title)}</span></h1>
         <div class="toolbar">
           <span class="muted" style="margin-right:6px">${s.page ? `원문 p.${s.page}~` : s.page_between ? `원문 p.${s.page_between[0]}~${s.page_between[1]} 사이 (목차에 없는 절)` : '원문 쪽 정보 없음'}</span>
           <button type="button" class="btn outline" data-act="cite" data-id="${s.id}">${I.copy}출처 복사</button>
           ${pdfToggle(s, s.pdf)}
           <button type="button" class="btn" data-act="link">${I.link}링크 복사</button>
           <button type="button" class="btn" data-act="print">${I.print}인쇄</button>
-          ${q ? `<span class="hitnav"><span>‘${esc(q)}’ <strong data-hitpos>0</strong> / <span data-hittotal>0</span></span><button type="button" data-act="hit-prev" aria-label="이전 일치 항목">${I.up}</button><button type="button" data-act="hit-next" aria-label="다음 일치 항목">${I.down}</button></span>` : ''}
+          ${q ? `<span class="hitnav" data-q="${esc(q)}"><span>‘${esc(q)}’ <strong data-hitpos>0</strong> / <span data-hittotal>0</span></span><button type="button" data-act="hit-prev" aria-label="이전 일치 항목">${I.up}</button><button type="button" data-act="hit-next" aria-label="다음 일치 항목">${I.down}</button></span>` : ''}
         </div>
         <div class="content">${s.blocks.length ? renderBlocks(s, alts) : (kids.length ? `<p class="muted">이 ${s.level === 1 ? '장' : '절'}은 아래 항목으로 이루어져 있습니다.</p><ul class="children">${kids.map((k) => `<li><a href="#/s/${k.id}">${numTag(k.num)}${esc(k.title)}<span class="muted" style="margin-left:auto">${k.page ? 'p.' + k.page : ''}</span></a></li>`).join('')}</ul>` : '<p class="muted">본문이 없습니다.</p>')}</div>
         <p class="print-cite">출처: ${esc(citation(s))}</p>
@@ -941,12 +959,14 @@
   function tableToTSV(b) {
     const grid = [];
     b.cells.forEach((c) => { for (let dr = 0; dr < (c.rs || 1); dr++) for (let dc = 0; dc < (c.cs || 1); dc++) { (grid[c.r + dr] = grid[c.r + dr] || [])[c.c + dc] = dr || dc ? '' : S.plainText(c).replace(/\s*\n\s*/g, ' '); } });   // 수식 셀은 읽을 수 있는 글로
-    return grid.map((row) => Array.from({ length: b.cols }, (_, i) => (row && row[i]) || '').join('\t'));
+    // '=56.8m', '+ d2'처럼 =·+·-·@로 시작하는 글을 엑셀이 수식으로 읽지 않게 앞에 빈칸 (순수한 수 '-3.5'는 그대로)
+    const safe = (t) => (/^[=@]/.test(t) || /^[+-](?!\d+(\.\d+)?$)/.test(t) ? ' ' + t : t);
+    return grid.map((row) => Array.from({ length: b.cols }, (_, i) => safe((row && row[i]) || '')).join('\t'));
   }
   function viewTable(id, bi) {
     const s = idx.byId.get(id);
     const b = s && s.blocks[+bi];
-    if (!b || b.t !== 'table') return topbar('', 'table', 'tables') + `<main id="main" class="page"><p class="empty card">표를 찾을 수 없습니다.</p></main>${bottomnav('tables')}`;
+    if (!b || b.t !== 'table') return topbar('', 'table', 'tables') + `<main id="main" class="page"><div class="empty card"><p>표를 찾을 수 없습니다.</p><p>${s ? `<a href="#/s/${s.id}">${esc(s.num)} ${esc(s.title)} 본문 보기</a> · ` : ''}<a href="#/tables">표 모음 보기</a></p></div></main>${bottomnav('tables')}`;
     document.title = `${b.caption || '표'} — 조사설계실무요령`;
     return topbar('', 'table', 'tables') + `<main id="main" class="page"><div class="main">
       <p class="path" style="margin:0">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page + '~' : ''}</p>
@@ -987,7 +1007,7 @@
     ];
   }
   function viewFlow(params) {
-    const bi = Math.min(Math.max(+(params.get('b') || 0), 0), BIZ.length - 1);
+    const bi = Math.min(Math.max(parseInt(params.get('b'), 10) || 0, 0), BIZ.length - 1);   // 'b=x'·'b=1.5'도 안전하게
     const vol = BIZ[bi];
     const v = D.vols.find((x) => x.id === vol);
     document.title = '업무 흐름 — 조사설계실무요령';
@@ -1002,7 +1022,7 @@
     return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main">
       <h1 style="margin:0;font-size:1.75rem">업무 흐름으로 찾기</h1>
       <p class="muted" style="margin:0">사업을 고르면 예정지 조사부터 설계서 작성까지 단계별로 볼 장을 보여줍니다.</p>
-      <div class="biz" role="tablist" aria-label="사업 유형">${BIZ.map((vid, i) => `<button type="button" role="tab" aria-selected="${i === bi}" data-act="biz" data-b="${i}">${esc(D.vols.find((x) => x.id === vid).name)}</button>`).join('')}</div>
+      <div class="biz" role="group" aria-label="사업 유형">${BIZ.map((vid, i) => `<button type="button" aria-pressed="${i === bi}" data-act="biz" data-b="${i}">${esc(D.vols.find((x) => x.id === vid).name)}</button>`).join('')}</div>
       <ol class="steps-grid">${steps.map((st) => `<li class="${st.own ? 'own' : 'common'}">
         <span style="display:flex;align-items:center;gap:8px"><span class="n">${st.n}</span><strong>${st.title}</strong></span>
         <span class="muted" style="font-size:.9375rem">${st.own ? `제${vol}편 ${esc(v.name)}` : st.src}</span>
@@ -1026,6 +1046,8 @@
   let curEntry = null;
   let entrySeq = Date.now();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  let lastSearchKey = null;
+  let focusAfter = null;   // 다시 그린 뒤 초점을 둘 곳(편 고르기·사업 단추)
   function render(hash) {
     const { parts, params } = parseHash(typeof hash === 'string' ? hash : undefined);
     if (askCtl) { askCtl.abort(); askCtl = null; }   // 화면을 떠나면 진행 중인 답변 요청을 끊는다
@@ -1051,13 +1073,29 @@
     }
     document.documentElement.classList.remove('pdf-modal', 'pdf-detail');
     if (typeof hash !== 'string' && !(history.state && history.state.layer)) layers.length = 0;   // 앞 화면의 원문 창(폰 전체 화면)·크게 보기는 닫힌다
+    // 같은 검색어에서 편 필터·'결과 더 보기'만 바뀐 경우: 맨 위로 튀지 않고, 펴 둔 필터와 초점을 그대로
+    const searchKey = parts[0] === 'search' ? `${params.get('q') || ''}|${params.get('scope') || 'all'}` : null;
+    const same = searchKey != null && searchKey === lastSearchKey && typeof hash !== 'string' && !back;
+    const keep = same ? {
+      y: window.scrollY,
+      filt: !!app.querySelector('.filters details[open]'),
+      vol: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.vol : null,
+      count: app.querySelectorAll('ol.results > li').length,
+    } : null;
+    lastSearchKey = searchKey;
     app.innerHTML = html;
-    window.scrollTo(0, 0);
+    if (keep && keep.filt) { const d = app.querySelector('.filters details'); if (d) d.open = true; }
+    window.scrollTo(0, keep ? keep.y : 0);
+    acFits.length = 0;
     app.querySelectorAll('form[data-form="search"]').forEach(attachAutocomplete);
     // 화면이 바뀌면 화면 읽기 프로그램이 새 제목부터 읽도록 초점을 h1로 (첫 화면·시험 호출 제외)
     if (rendered && typeof hash !== 'string') {
+      const after = focusAfter && app.querySelector(focusAfter);
+      focusAfter = null;
+      const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a`));
       const h1 = app.querySelector('h1');
-      if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
+      if (next) next.focus({ preventScroll: true });
+      else if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
     }
     rendered = true;
     setupHits();
@@ -1090,6 +1128,12 @@
     if (!tot) return;
     tot.textContent = marks.length;
     hitIdx = 0;
+    if (!marks.length) {   // '0 / 0'과 누를 수 없는 화살표 대신 한 줄 안내
+      const nav = tot.closest('.hitnav');
+      nav.classList.add('none');
+      nav.firstElementChild.textContent = `‘${nav.dataset.q}’ — 이 절 본문에는 없습니다`;
+      nav.querySelectorAll('button').forEach((b) => b.remove());
+    }
     if (marks.length) moveHit(0);
   }
   function moveHit(delta) {
@@ -1104,30 +1148,34 @@
   }
 
   /* ---------------- 자동완성 ---------------- */
+  // 자판이 올라올 때 맞출 목록들 — 화면마다 새로 채운다(그릴 때마다 visualViewport에 귀를 다는 누수 방지)
+  const acFits = [];
+  if (window.visualViewport) visualViewport.addEventListener('resize', () => acFits.forEach((f) => f()));
   function attachAutocomplete(form) {
     const input = form.querySelector('input[name="q"]');
     const box = form.querySelector('.ac');
     let sel = -1;
     const opts = () => [...box.querySelectorAll('.opt')];
-    const close = () => { box.hidden = true; input.setAttribute('aria-expanded', 'false'); sel = -1; };
+    const close = () => { box.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); sel = -1; };
     function update() {
       const q = input.value.trim();
       if (!q) return close();
       const { sections, synonym } = idx.suggest(q, wide(700) ? 6 : 4);   // 폰: 자판이 화면 절반을 덮으므로 4개만
       const parts = [];
       if (sections.length) {
-        parts.push('<span class="grp">절 바로가기</span>');
+        parts.push('<span class="grp" role="presentation">절 바로가기</span>');
         sections.forEach((s) => parts.push(`<a class="opt" role="option" href="#/s/${s.id}">${numTag(s.num)}<span>${S.highlight(s.title, [q])}</span><span class="where">제${s.vol}편${s.page ? ' · p.' + s.page : ''}</span></a>`));
       }
-      parts.push(`<span class="grp${parts.length ? ' sep' : ''}">검색어</span>`);
+      parts.push(`<span class="grp${parts.length ? ' sep' : ''}" role="presentation">검색어</span>`);
       parts.push(`<a class="opt" role="option" href="#/search?q=${q2(synonym ? synonym.word : q)}">${I.search}<span>${esc(synonym ? synonym.word : q)}</span>${synonym ? `<span class="tag calc" style="margin-left:auto">동의어 ‘${esc(synonym.others.join('’, ‘'))}’도 함께 검색</span>` : ''}</a>`);
       if (FEATURES.ask && q.length >= 4) {
-        parts.push('<span class="grp sep">질문으로 찾기</span>');
+        parts.push('<span class="grp sep" role="presentation">질문으로 찾기</span>');
         parts.push(`<a class="opt" role="option" href="#/ask?q=${q2(q)}">${I.ask}<span>‘${esc(q)}’ 질문하기</span></a>`);
       }
-      parts.push('<div class="hint"><span>절 번호를 입력하면 바로 이동합니다 (예: 4.5.6)</span><span class="kbd">↑↓ 이동 · Enter 선택 · Esc 닫기</span></div>');
+      parts.push('<div class="hint" role="presentation"><span>절 번호를 입력하면 바로 이동합니다 (예: 4.5.6)</span><span class="kbd">↑↓ 이동 · Enter 선택 · Esc 닫기</span></div>');
       box.innerHTML = parts.join('');
-      box.hidden = false; input.setAttribute('aria-expanded', 'true'); sel = -1;
+      opts().forEach((o, i) => { o.id = `${box.id}-o${i}`; });   // 화면 읽기 프로그램이 ↑↓로 고른 항목을 읽도록
+      box.hidden = false; input.setAttribute('aria-expanded', 'true'); input.removeAttribute('aria-activedescendant'); sel = -1;
       fit();
     }
     // 폰 자판이 올라오면 보이는 높이(visualViewport)가 줄어든다 → 목록이 자판 밑으로 숨지 않게 그 안에서 스크롤
@@ -1137,22 +1185,28 @@
       const top = box.getBoundingClientRect().top;
       box.style.maxHeight = Math.max(160, vh - top - 8) + 'px';
     }
-    if (window.visualViewport) visualViewport.addEventListener('resize', fit);
+    acFits.push(fit);
     input.addEventListener('input', update);
     input.addEventListener('focus', () => { if (input.value.trim()) update(); });
     input.addEventListener('blur', () => setTimeout(close, 150));
     input.addEventListener('keydown', (e) => {
-      if (box.hidden) return;
+      if (box.hidden || e.isComposing || e.keyCode === 229) return;   // 한글 조합 중의 ↑↓·Enter는 글자 입력용
       const list = opts();
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + list.length + 1) % (list.length + 1) - 0;
         if (sel === list.length) sel = -1;
         list.forEach((o, i) => o.setAttribute('aria-selected', String(i === sel)));
+        if (list[sel]) input.setAttribute('aria-activedescendant', list[sel].id); else input.removeAttribute('aria-activedescendant');
         if (list[sel]) list[sel].scrollIntoView({ block: 'nearest' });
       } else if (e.key === 'Enter' && sel >= 0 && list[sel]) {
-        e.preventDefault(); close(); location.hash = list[sel].getAttribute('href');
-      } else if (e.key === 'Escape') close();
+        e.preventDefault();
+        const href = list[sel].getAttribute('href');   // close()가 sel을 -1로 되돌리므로 먼저 읽는다
+        close(); location.hash = href;
+      } else if (e.key === 'Escape') {
+        // 목록만 닫는다: 브라우저가 검색칸 글자를 지우거나, 옆의 원문 창까지 닫히지 않게
+        e.preventDefault(); e.stopPropagation(); close();
+      }
     });
   }
 
@@ -1174,11 +1228,12 @@
     if (t.matches('[data-vol]')) {
       const { params } = parseHash();
       const boxes = [...app.querySelectorAll('[data-vol]')];
-      const on = boxes.filter((b) => b.checked).map((b) => b.dataset.vol);
+      const on = boxes.filter((b) => b.checked && !b.disabled).map((b) => b.dataset.vol);   // 결과 0인 편(흐린 칸)은 세지 않는다
       params.set('v', on.length === boxes.filter((b) => !b.disabled).length ? '' : on.join(','));
       params.delete('page');
       location.hash = `#/search?${params}`;
     } else if (t.matches('[data-act="vol"]')) {
+      focusAfter = '#volsel';   // 키보드 ↑↓로 편을 넘길 때 초점이 제목으로 튀지 않게
       location.hash = `#/s/${t.value}-ch1`;
     }
   });
@@ -1191,6 +1246,16 @@
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const act = el.dataset.act;
+    if (act === 'toc-jump') {
+      const d = app.querySelector('.toc details');
+      if (!d) return;   // 본문 화면이 아니면 링크대로(제1편 목차)
+      e.preventDefault();
+      d.open = true;
+      const cur = d.querySelector('[aria-current="page"]');
+      (cur || d).scrollIntoView({ block: cur ? 'center' : 'start' });
+      (cur || d.querySelector('summary')).focus({ preventScroll: true });
+      return;
+    }
     if (act === 'pdf-toggle' || act === 'pdf-at' || act.startsWith('pp-')) {
       const id = parseHash().parts[1];
       const ps = idx.byId.get(id);
@@ -1265,6 +1330,7 @@
     } else if (act === 'hit-prev' || act === 'hit-next') {
       moveHit(act === 'hit-next' ? 1 : -1);
     } else if (act === 'biz') {
+      focusAfter = `[data-act="biz"][data-b="${el.dataset.b}"]`;   // 다시 그린 뒤에도 고른 단추에 초점
       location.hash = `#/flow?b=${el.dataset.b}`;
     } else if (act === 'ev') {
       const card = app.querySelector(`#ev${el.dataset.n}`);
@@ -1314,7 +1380,8 @@
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); detailGo(e.key === 'ArrowRight' ? 1 : -1); }
       return;
     }
-    if (e.key === 'Escape' && paneEl()) { closePane(); dropLayer('pane'); if (wide(1100)) store.set('krc.pdfpane', '0'); }
+    // 검색칸·편 고르기 등에서 누른 Esc는 원문 창을 닫지 않는다
+    if (e.key === 'Escape' && paneEl() && !e.defaultPrevented && !(e.target.closest && e.target.closest('input, select, textarea'))) { closePane(); dropLayer('pane'); if (wide(1100)) store.set('krc.pdfpane', '0'); }
   });
   window.addEventListener('hashchange', render);
   render();
