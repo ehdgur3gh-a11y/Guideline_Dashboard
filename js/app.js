@@ -634,7 +634,7 @@
     if (r.synonyms.length) notes.push(`<span class="tag calc">동의어 포함: ${esc(r.synonyms.join(', '))}</span>`);
     if (r.terms.length > 1 || r.terms.join('') !== q.trim()) notes.push(`<span class="tag info">찾은 키워드: ${esc(r.terms.join(', '))}</span>`);
     // 폰: 안내는 한 줄, '편으로 좁히기'는 옆으로 미는 칩(한 편 고르기) — 결과가 첫 화면에 바로 보이게
-    const sumLine = `<p class="sumline">‘${esc(q)}’ ${r.hits.length}개 절${r.synonyms.length ? ` · 동의어 ‘${esc(r.synonyms.join(', '))}’도 함께` : ''} · 띄어쓰기 차이 무시</p>`;
+    const sumLine = `<p class="sumline">‘${esc(q)}’ ${r.hits.length}개 절${r.synonyms.length ? ` · ‘${esc(r.synonyms.join(', '))}’도 함께 찾음` : ''}</p>`;
     const vHref = (id) => `#/search?${new URLSearchParams(Object.assign({ q }, scope !== 'all' ? { scope } : {}, id ? { v: String(id) } : {}))}`;
     const one = vols.size === 1 ? [...vols][0] : 0;
     const vTotal = Object.values(r.counts).reduce((a, b) => a + b, 0);
@@ -642,8 +642,8 @@
 
     // 검색어 전체가 용어일 때만(낱말 하나일 때는 조사를 뗀 형태도) — '저수지 여유고'에서 '저수지' 정의가 뜨지 않게
     const defHit = scope === 'body' ? null : termFor(q, r.terms.length === 1 ? r.terms : []);
-    const numCards = numHits.slice(0, 4).map((s) => `<a class="titlehit" href="#/s/${s.id}"><span class="k">절 번호로 바로 가기</span><span class="t">${numTag(s.num)}<span class="tt">${esc(s.title)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
-    const titleCards = r.titleHits.map((s) => `<a class="titlehit" href="#/s/${s.id}?q=${q2(q)}"><span class="k">절 제목 일치${s.title_raw && s.title_raw !== s.title ? ` — 원문 표기 ‘${esc(s.title_raw)}’` : ''}</span><span class="t">${numTag(s.num)}<span class="tt">${S.highlight(s.title, r.alts)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
+    const numCards = numHits.slice(0, 4).map((s) => `<a class="titlehit" href="#/s/${s.id}"><span class="k">절 번호</span><span class="t">${numTag(s.num)}<span class="tt">${esc(s.title)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
+    const titleCards = r.titleHits.map((s) => `<a class="titlehit" href="#/s/${s.id}?q=${q2(q)}"${s.title_raw && s.title_raw !== s.title ? ` title="원문 표기 ‘${esc(s.title_raw)}’"` : ''}><span class="k">제목 일치</span><span class="t">${numTag(s.num)}<span class="tt">${S.highlight(s.title, r.alts)}</span></span><span class="path">${esc(idx.path(s).join(' › '))}${s.page ? ' · p.' + s.page : ''}</span></a>`).join('');
     const items = shown.map((hit) => {
       const s = hit.s;
       const snips = idx.snippets(hit, r.alts, 2).map((x) => `<span class="snip">${x.kind === 'table' || x.kind === 'cap' ? '<span class="k">[표]</span>' : ''}${x.html}</span>`).join('');
@@ -998,7 +998,7 @@
         <ul>${tocItems}</ul>
       </details></nav>
       <article class="article">
-        <p class="path" style="margin:0">${esc(path.join(' › '))}<span class="pgm">${s.page ? ` · 원문 p.${s.page}~` : ''}</span></p>
+        <p class="path" style="margin:0"><span class="pfull">${esc(path.join(' › '))}<span class="pgm">${s.page ? ` · 원문 p.${s.page}~` : ''}</span></span><span class="pshort">${esc([...new Set([path[0] ? path[0].replace(/^(제\d+편).*$/, '$1') : '', path.length > 1 ? path[path.length - 1] : ''])].filter(Boolean).join(' · '))}${s.page ? ` · p.${s.page}` : ''}</span></p>
         <h1>${numTag(s.num)}<span class="tt">${esc(s.title)}</span></h1>
         <div class="toolbar">
           <span class="muted" style="margin-right:6px">${s.page ? `원문 p.${s.page}~` : s.page_between ? `원문 p.${s.page_between[0]}~${s.page_between[1]} 사이 (목차에 없는 절)` : '원문 쪽 정보 없음'}</span>
@@ -1359,7 +1359,8 @@
     };
     return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page">
       <div class="pagehead"><h1>시설정보</h1><span class="muted">농업생산기반시설 · 공사 관리 ${F.types.reduce((n, t) => n + t.rows.length, 0).toLocaleString('ko-KR')}곳</span></div>
-      <nav class="chips present" aria-label="전국 현황 (통계연보 2024)"><span class="tot">전국 <strong>${P.total[0].toLocaleString('ko-KR')}</strong></span>${P.rows.map(([n, all, krc]) => `<span>${esc(n)} <strong>${all.toLocaleString('ko-KR')}</strong><small>공사 ${krc.toLocaleString('ko-KR')}</small></span>`).join('')}</nav>
+      <details class="present"${wide(700) ? ' open' : ''}><summary>전국 ${P.total[0].toLocaleString('ko-KR')}곳 · 시설별 현황 <small>(통계연보 2024)</small></summary>
+      <nav class="chips present" aria-label="전국 현황 (통계연보 2024)"><span class="tot">전국 <strong>${P.total[0].toLocaleString('ko-KR')}</strong></span>${P.rows.map(([n, all, krc]) => `<span>${esc(n)} <strong>${all.toLocaleString('ko-KR')}</strong><small>공사 ${krc.toLocaleString('ko-KR')}</small></span>`).join('')}</nav></details>
       <form class="facform" data-form="fac" role="search" aria-label="시설 찾기">
         <input type="hidden" name="t" value="${esc(type.key)}">${sub ? `<input type="hidden" name="sub" value="${esc(sub)}">` : ''}
         <label class="btn tv-find">${I.search}<span class="sr">시설명 또는 소재지</span><input name="q" type="search" value="${esc(q)}" placeholder="시설명·소재지 (예: 용천, 기장군)" spellcheck="false" autocomplete="off" enterkeyhint="search"></label>
@@ -1454,10 +1455,10 @@
         ? `<p class="lead">이 단계에서 할 일 (차례대로)</p><ol class="todo">${todo.map((x) => `<li><a href="#/s/${x.id}"><span class="n">${esc(x.num)}</span><span class="t">${esc(x.title)}</span>${x.page ? `<span class="muted">p.${x.page}</span>` : ''}</a></li>`).join('')}</ol>`
         : `<p class="lead">${st.n === 3 ? '설계할 시설을 고르세요' : '볼 장'}</p><ol class="todo">${chs.map((c) => `<li><a href="#/s/${c.id}"><span class="n">${esc(c.num)}</span><span class="t">${esc(c.title)}</span>${c.page ? `<span class="muted">p.${c.page}</span>` : ''}</a></li>`).join('') || '<li class="muted">—</li>'}</ol>`;
       return `<li class="step${st.own ? '' : ' common'}"><details${open ? ' open' : ''}>
-        <summary><span class="dot">${st.n}</span><span class="h"><strong>${st.title}</strong><span class="muted">${st.own ? `제${vol}편 ${esc(v.name)}${chs[0] ? ` · ${esc(chs.map((c) => c.num).join('·'))}` : ''}` : st.src + ' (모든 사업 공통)'}</span></span><span class="muted cnt">${todo.length ? `할 일 ${todo.length}` : `장 ${chs.length}`}</span></summary>
+        <summary><span class="dot">${st.n}</span><span class="h"><strong>${st.title}</strong><span class="muted">${st.own ? `제${vol}편 ${esc(v.name)}${chs[0] ? ` · ${esc(chs.map((c) => c.num).join('·'))}` : ''}` : st.src + ' (모든 사업 공통)'}</span></span><span class="muted cnt">${todo.length ? `할 일 ${todo.length}` : `${chs.length}개 장`}</span></summary>
         <div class="sbody">
           ${list}
-          ${flows.length ? `<p class="row"><span class="muted">흐름도</span>${flows.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
+          ${flows.length ? `<p class="row flows"><span class="muted">흐름도</span>${flows.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
           ${st.also && st.also.length ? `<p class="row"><span class="muted">함께 볼 장</span>${st.also.map((c) => `<a class="tchip" href="#/s/${c.id}">${esc(c.num)} ${esc(c.title)}</a>`).join('')}</p>` : ''}
           ${report ? `<p class="row"><span class="muted">산출물</span><a class="out" href="#/s/${report.id}">${esc(outName)}</a></p>` : ''}
           ${terms.length ? `<p class="row"><span class="muted">용어</span>${terms.map((g) => `<a class="tchip" href="#/terms?t=${termSlug(g.t)}">${esc(g.t)}</a>`).join('')}</p>` : ''}
@@ -1473,12 +1474,12 @@
     return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main flow-page">
       <div class="pagehead"><h1>업무 흐름</h1><span class="muted">예정지 조사부터 설계서 작성까지 6단계</span></div>
       <div class="biz" role="group" aria-label="사업 유형">${BIZ.map((vid, i) => `<button type="button" aria-pressed="${i === bi}" data-act="biz" data-b="${i}">${esc(D.vols.find((x) => x.id === vid).name)}</button>`).join('')}</div>
-      ${overall.length ? `<p class="row overall"><span class="muted">사업 전체 흐름도</span>${overall.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
+      ${overall.length ? `<p class="row overall flows"><span class="muted">사업 전체 흐름도</span>${overall.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
       <ol class="stepper">${steps.map(stepHtml).join('')}</ol>
       <p class="muted" style="margin:0;font-size:.9375rem">1~3단계는 사업별 편, 4~6단계는 모든 사업이 함께 쓰는 공통 편입니다. 단계를 누르면 펼쳐집니다.</p>
-      <section class="matrix"><h2 style="font-size:1.1875rem">한눈에 — 사업 × 단계</h2>
+      <details class="matrix"${wide(700) ? ' open' : ''}><summary><h2>한눈에 — 사업 × 단계</h2><span class="muted">표로 보기</span></summary>
         <div class="tblwrap"><table class="data"><thead><tr><th scope="col">사업</th><th scope="col">1 예정지 조사</th><th scope="col">2 조사측량·현장조사</th><th scope="col">3 계획·시설 설계</th></tr></thead><tbody>${matrix}</tbody></table></div>
-      </section>
+      </details>
     </div></main>${bottomnav('flow')}`;
   }
 
