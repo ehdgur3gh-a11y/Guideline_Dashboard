@@ -560,25 +560,13 @@
   const saveBtn = (s) => { const on = savedGet().includes(s.id); return `<button type="button" class="btn save${on ? ' on' : ''}" data-act="save" data-id="${s.id}" aria-pressed="${on}">${on ? I.starOn : I.star}<span>${on ? '저장됨' : '저장'}</span></button>`; };
   const secLi = (id, extra = '') => { const s = idx.byId.get(id); return `<li><a href="#/s/${id}">${numTag(s.num)}<span class="t">${esc(s.title)}</span><span class="muted">제${s.vol}편</span></a>${extra}</li>`; };
   /** 홈의 '내 절': 저장한 절 / 최근 본 절 두 갈래 (둘 다 없으면 그리지 않는다) */
-  function mineHtml() {
-    const saved = savedGet(), recent = recentGet();
-    if (!saved.length && !recent.length) return '';
-    const tab = saved.length && store.get('krc.mytab', 'saved') !== 'recent' ? 'saved' : 'recent';
-    // 두 갈래 고르기: 눌림 단추(aria-pressed) — 탭 역할을 흉내 내지 않는다(화살표 키 없는 탭 목록보다 정직)
-    const t = (key, label) => `<button type="button" id="mt-${key}" aria-controls="mp-${key}" aria-pressed="${tab === key}" data-act="mytab" data-tab="${key}">${label}</button>`;
-    const panel = (key, list, empty) => `<div class="mpanel" id="mp-${key}" aria-labelledby="mt-${key}"${tab === key ? '' : ' hidden'}>${list.length ? `<ul>${list.slice(0, 6).map((id) => secLi(id)).join('')}</ul>` : `<p class="muted" style="margin:8px 4px">${empty}</p>`}</div>`;
-    return `<section class="recent mine" aria-label="내 절">
-        <div class="head"><div class="seg" role="group" aria-label="내 절">${t('saved', `★ 저장한 절 ${saved.length}`)}${t('recent', '최근 본 절')}</div><a class="linklike" href="#/saved">모두 보기</a></div>
-        ${panel('saved', saved, '본문의 ☆ 저장을 누르면 여기에 모입니다.')}${panel('recent', recent, '아직 본 절이 없습니다.')}
-      </section>`;
-  }
   /* 저장 화면: 저장한 절(지우기 가능) + 최근 본 절 */
   function viewSaved() {
     document.title = '저장한 절 — 조사설계실무요령';
     const saved = savedGet(), recent = recentGet();
     const rm = (id) => { const s = idx.byId.get(id); return `<button type="button" class="icon-btn" data-act="unsave" data-id="${id}" aria-label="제${s.vol}편 ${esc([s.num, s.title].filter(Boolean).join(' '))} 저장 지우기" title="저장 지우기">${I.x}</button>`; };
     return topbar('', 'all', 'saved') + `<main id="main" class="page"><div class="main saved-page">
-      <h1 style="margin:0;font-size:1.75rem">저장한 절</h1>
+      <div class="pagehead"><p class="eyebrow">SAVED</p><h1>저장한 절</h1></div>
       <section class="recent mine">${saved.length ? `<ul>${saved.map((id) => secLi(id, rm(id))).join('')}</ul>` : '<p class="muted">아직 저장한 절이 없습니다. 본문 위의 ☆ 저장을 누르면 여기에 모입니다(이 기기에만 저장).</p>'}</section>
       <div class="head" style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><h2 style="margin:8px 0 0;font-size:1.25rem">최근 본 절</h2>${recent.length ? '<button type="button" class="linklike" data-act="recent-clear">지우기</button>' : ''}</div>
       <section class="recent mine recent-list">${recent.length ? `<ul>${recent.map((id) => secLi(id)).join('')}</ul>` : '<p class="muted">아직 본 절이 없습니다.</p>'}</section>
@@ -594,13 +582,12 @@
       </div></header>
       <main id="main" class="home-main">
         <section class="hero" aria-label="검색">
-          <h1>무엇을 찾으세요?</h1>
-          <p class="lead">본문 ${idx.sections.length.toLocaleString('ko-KR')}개 절 · 용어 ${GL.length}개에서 찾습니다</p>
-          <div class="row">${searchForm('', 'all', true)}${FEATURES.ask ? `<a class="ask" href="#/ask" data-act="ask">${I.ask}질문하기</a>` : ''}</div>
-          <p class="ex"><span class="sr">예: </span>${[['여유고', `#/search?q=${q2('여유고')}`], ['물넘이', `#/search?q=${q2('물넘이')}`], ['4.2.1', '#/s/1-4.2.1'], ['필댐의 여유고는?', `#/search?q=${q2('물넘이 게이트가 없는 필댐의 여유고')}`]].map(([l, h]) => `<a class="tchip" href="${h}">${l}</a>`).join('')}</p>
+          <div class="band"><div class="in"><p class="eyebrow">KRC · DESIGN GUIDELINE</p><h1>무엇을 찾으세요?</h1></div></div>
+          <div class="in2"><div class="row">${searchForm('', 'all', true)}${FEATURES.ask ? `<a class="ask" href="#/ask" data-act="ask">${I.ask}질문하기</a>` : ''}</div>
+          <p class="ex"><span class="sr">예: </span>${[['여유고', `#/search?q=${q2('여유고')}`], ['물넘이', `#/search?q=${q2('물넘이')}`], ['4.2.1', '#/s/1-4.2.1'], ['필댐의 여유고는?', `#/search?q=${q2('물넘이 게이트가 없는 필댐의 여유고')}`]].map(([l, h]) => `<a class="tchip" href="${h}">${l}</a>`).join('')}</p></div>
         </section>
         <section class="facilities" aria-label="시설·분야로 찾기">
-          <div class="head"><h2>시설·분야로 찾기</h2><a href="#/flow">업무 흐름으로 보기 →</a></div>
+          <div class="head"><div><p class="eyebrow">BROWSE</p><h2>시설·분야로 찾기</h2></div><a href="#/flow">업무 흐름으로 보기 →</a></div>
           <div class="tiles">${FACILITIES.map(([n, id, d]) => `<a class="tile" href="#/s/${id}"><span class="ic">${fac(d)}</span>${n}</a>`).join('')}</div>
         </section>
       </main>
@@ -616,7 +603,6 @@
     document.title = `‘${q}’ 검색 — 조사설계실무요령`;
     if (!q.trim()) return topbar('', scope, null, '') + `<main id="main" class="page"><div class="main"><p class="empty">검색어를 입력하세요.</p></div></main>${bottomnav('home')}`;
 
-    rqAdd(q);
     if (scope === 'title') return viewTitleSearch(q, scope);
     const r = idx.search(q, { vols, scope });
     const tables = tablesMatching(q).list;
@@ -633,7 +619,7 @@
     if (r.synonyms.length) notes.push(`<span class="tag calc">동의어 포함: ${esc(r.synonyms.join(', '))}</span>`);
     if (r.terms.length && (r.terms.length > 1 || r.terms.join('') !== q.trim())) notes.push(`<span class="tag info">찾은 키워드: ${esc(r.terms.join(', '))}</span>`);
     // 폰: 안내는 한 줄, '편으로 좁히기'는 옆으로 미는 칩(한 편 고르기) — 결과가 첫 화면에 바로 보이게
-    const sumLine = `<p class="sumline">‘${esc(q)}’ ${r.hits.length}개 절${r.synonyms.length ? ` · ‘${esc(r.synonyms.join(', '))}’도 함께 찾음` : ''}</p>`;
+    const sumLine = r.synonyms.length ? `<p class="sumline">‘${esc(r.synonyms.join(', '))}’도 함께 찾았습니다</p>` : '';   // 결과 수는 위 머리표(RESULTS · N)에
     const vHref = (id) => `#/search?${new URLSearchParams(Object.assign({ q }, scope !== 'all' ? { scope } : {}, id ? { v: String(id) } : {}))}`;
     const one = vols.size === 1 ? [...vols][0] : 0;
     const vTotal = Object.values(r.counts).reduce((a, b) => a + b, 0);
@@ -672,9 +658,9 @@
     return topbar(q, scope, null, resultTabs(q, 'search', r.hits.length, tables.length)) + `<main id="main" class="page">
       <aside class="filters" aria-label="검색 필터"><details${wide(700) ? ' open' : ''}><summary>편으로 좁히기${vols.size ? ` (${vols.size}개 선택)` : ''}</summary><fieldset><legend class="sr">편</legend>${volBoxes}</fieldset></details></aside>
       <div class="main">
-        <h1 class="sr">‘${esc(q)}’ 검색 결과</h1>
+        <div class="reshead"><p class="eyebrow">RESULTS · ${r.hits.length.toLocaleString('ko-KR')}</p><h1>‘${esc(q)}’ 검색 결과</h1></div>
         ${vchips}${sumLine}
-        <div class="summary"><span class="muted">‘${esc(q)}’ <strong style="color:var(--ink)">${r.hits.length}개 절</strong> · ${r.total}문단</span>${notes.join('')}</div>
+        <div class="summary"><span class="muted">${r.total}문단에서 찾음</span>${notes.join('')}</div>
         ${facSlot}${defHit ? defCard(defHit) : ''}${numCards}${titleCards}
         ${items ? `<ol class="results">${items}</ol>${more}` : nothing ? emptyHtml : filteredOut ? `<p class="empty card">고른 편에는 ‘${esc(q)}’이(가) 없습니다. <a href="${vHref(0)}">전체 편에서 보기 (${vTotal}개 절)</a></p>` : ''}
       </div>
@@ -1192,7 +1178,7 @@
     shown.forEach((t) => { (byVol[t.s.vol] = byVol[t.s.vol] || []).push(t); });
     const tabs = q ? resultTabs(q, 'tables', null, list.length) : '';
     return topbar(q, 'table', 'tables', tabs) + `<main id="main" class="page"><div class="main tables-page">
-      <h1 style="margin:0;font-size:1.75rem">표 모음</h1>
+      <div class="pagehead"><p class="eyebrow">TABLES</p><h1>표 모음</h1></div>
       <p class="muted" style="margin:0">${q ? `제목에 ‘${esc(q)}’가 들어간 표 ${all.length}개` : `제목이 있는 표 ${all.length}개`}${list.length > shown.length ? ` (앞의 ${shown.length}개 표시 — 편을 고르면 모두 보입니다)` : ''}</p>
       ${chips}
       ${Object.keys(byVol).map((vid) => `<section><h2 style="font-size:1.25rem;margin:10px 0">제${vid}편 ${esc(D.vols.find((v) => v.id === +vid).name)}</h2><ul class="tbl-list">${byVol[vid].map((t) => `<li><a href="#/t/${t.s.id}/${t.bi}"><span>${alts.length ? S.highlight(t.caption, alts) : esc(t.caption)}</span><small>${esc(t.s.num)} ${esc(t.s.title)}${t.s.page ? ' · p.' + t.s.page : ''}</small></a></li>`).join('')}</ul></section>`).join('') || '<p class="empty card">해당하는 표가 없습니다.</p>'}
@@ -1290,7 +1276,7 @@
     list.forEach((g) => { const c = initialOf(g.t); if (!groups.length || groups[groups.length - 1].c !== c) groups.push({ c, items: [] }); groups[groups.length - 1].items.push(g); });
     const nOrig = GL.reduce((n, g) => n + g.defs.filter((d) => d.id).length, 0);
     return topbar('', 'all', 'terms') + `<main id="main" class="page"><div class="main terms-page">
-      <div class="pagehead"><h1>용어</h1><span class="muted">${GL.length}개 · 실무요령 원문 정의 ${nOrig}개 + RAWRIS 용어</span></div>
+      <div class="pagehead"><p class="eyebrow">GLOSSARY</p><h1>용어</h1><span class="muted">${GL.length}개 · 실무요령 원문 정의 ${nOrig}개 + RAWRIS 용어</span></div>
       <form class="tfind" data-form="terms" role="search"><label class="btn tv-find">${I.search}<span class="sr">용어 찾기</span><input name="q" type="search" value="${esc(q)}" placeholder="용어 찾기 (예: 조위, 이음, 수혜)" spellcheck="false" autocomplete="off" enterkeyhint="search"></label></form>
       ${chips}
       ${groups.length ? groups.map((gr) => `<section class="tgroup"><h2>${gr.c}</h2>${gr.items.map((g) => `<article class="term" id="term-${esc(g.t)}"${focus && focus === g.t ? ' data-focus="1"' : ''}>
@@ -1308,7 +1294,7 @@
     if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js'; sc.onload = res; sc.onerror = () => { facLoading = null; rej(); }; document.head.appendChild(sc); });
     return facLoading;
   }
-  const FAC_WORD = /저수지|양수장|배수장|양배수장|취입보|방조제|관정|집수암거|지구/;
+  const FAC_WORD = /저수지|양수장|배수장|양배수장|취입보|방조제|관정|집수암거/;   // '지구'는 흔한 말이라 빼서 쓸데없이 시설 자료(445KB)를 받지 않게
   // 검색어에서 시설 종류 말을 떼고 시설 이름과 맞춰 본다(이름이 같거나 그 이름으로 시작) — 검색 카드·자동완성이 같이 쓴다
   function facFind(q) {
     const F = window.KRC_FAC;
@@ -1358,7 +1344,7 @@
         const box = app.querySelector('.facload');
         if (box) box.innerHTML = '<p>시설 자료를 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><button type="button" class="btn" data-act="fac-retry">다시 시도</button>';
       });
-      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page"><h1 style="margin:0;font-size:1.75rem">시설정보</h1><div class="facload boot" role="status">시설 자료를 불러오는 중…</div></div></main>${bottomnav('fac')}`;
+      return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page"><div class="pagehead"><p class="eyebrow">FACILITIES</p><h1>시설정보</h1></div><div class="facload boot" role="status">시설 자료를 불러오는 중…</div></div></main>${bottomnav('fac')}`;
     }
     const F = window.KRC_FAC;
     const type = F.types.find((t) => t.key === params.get('t')) || F.types[0];
@@ -1401,7 +1387,7 @@
         </div></details></li>`;
     };
     return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page">
-      <div class="pagehead"><h1>시설정보</h1><span class="muted">농업생산기반시설 · 공사 관리 ${F.types.reduce((n, t) => n + t.rows.length, 0).toLocaleString('ko-KR')}곳</span></div>
+      <div class="pagehead"><p class="eyebrow">FACILITIES</p><h1>시설정보</h1><span class="muted">농업생산기반시설 · 공사 관리 ${F.types.reduce((n, t) => n + t.rows.length, 0).toLocaleString('ko-KR')}곳</span></div>
       <details class="present"><summary>전국 ${P.total[0].toLocaleString('ko-KR')}곳 · 시설별 현황 <small>(통계연보 2024)</small></summary>
       <nav class="chips present" aria-label="전국 현황 (통계연보 2024)"><span class="tot">전국 <strong>${P.total[0].toLocaleString('ko-KR')}</strong></span>${P.rows.map(([n, all, krc]) => `<span>${esc(n)} <strong>${all.toLocaleString('ko-KR')}</strong><small>공사 ${krc.toLocaleString('ko-KR')}</small></span>`).join('')}</nav></details>
       <form class="facform" data-form="fac" role="search" aria-label="시설 찾기">
@@ -1515,7 +1501,7 @@
       return `<tr><th scope="row" style="background:var(--surface-2)">${esc(vv.name)}</th><td>${cell(st[0].items)}</td><td>${cell(st[1].items)}</td><td>${cell(st[2].items)}</td></tr>`;
     }).join('');
     return topbar('', 'all', 'flow') + `<main id="main" class="page"><div class="main flow-page">
-      <div class="pagehead"><h1>업무 흐름</h1><span class="muted">예정지 조사부터 설계서 작성까지 6단계</span></div>
+      <div class="pagehead"><p class="eyebrow">WORKFLOW</p><h1>업무 흐름</h1><span class="muted">예정지 조사부터 설계서 작성까지 6단계</span></div>
       <div class="biz" role="group" aria-label="사업 유형">${BIZ.map((vid, i) => `<button type="button" aria-pressed="${i === bi}" data-act="biz" data-b="${i}">${esc(D.vols.find((x) => x.id === vid).name)}</button>`).join('')}</div>
       ${overall.length ? `<p class="row overall flows"><span class="muted">사업 전체 흐름도</span>${overall.map((f) => `<a class="flowtag" href="#/s/${f.id}">${I.flow.replace(/22/g, '16')}${esc(f.label)}</a>`).join('')}</p>` : ''}
       <ol class="stepper">${steps.map(stepHtml).join('')}</ol>
@@ -1537,13 +1523,15 @@
   let entrySeq = Date.now();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   let lastSearchKey = null;
+  let navHoldUntil = 0;   // 이 시각까지는 스크롤로 하단 탭을 숨기지 않는다(render가 정함)
   let lastPage = 1;   // 같은 검색에서 '더 보기'(쪽 늘림)일 때만 새로 나온 첫 항목으로 초점
   let curDepth = 0;   // 이 사이트 안에서 몇 번째 화면인지(기록마다 저장) — 폰 머리줄 '←'가 사이트 밖으로 나가지 않게
   let focusAfter = null;   // 다시 그린 뒤 초점을 둘 곳(편 고르기·사업 단추)
   function render(hash) {
     const { parts, params } = parseHash(typeof hash === 'string' ? hash : undefined);
     if (askCtl) { askCtl.abort(); askCtl = null; }   // 화면을 떠나면 진행 중인 답변 요청을 끊는다
-    document.documentElement.classList.remove('nav-hidden');   // 새 화면에서는 하단 탭을 다시 보인다
+    document.documentElement.classList.remove('nav-hidden', 'has-findbar');   // 새 화면에서는 하단 탭을 다시 보인다(찾기 칸은 다시 그리면 없어진다)
+    navHoldUntil = performance.now() + 700;   // 그린 직후 앱이 스스로 옮기는 스크롤(뒤로 위치 복원·찾은 말로 이동)에는 숨기지 않는다
     let html;
     switch (parts[0]) {
       case 'search': html = viewSearch(params); break;
@@ -1682,7 +1670,7 @@
         const parts = [];
         if (rq.length) {
           parts.push('<span class="grp" role="presentation">최근 검색</span>');
-          rq.forEach((x) => parts.push(`<div class="optrow" role="none"><a class="opt" role="option" href="#/search?q=${q2(x)}">${I.clock}<span>${esc(x)}</span></a><button type="button" class="rq-del" data-rq="${esc(x)}" tabindex="-1" aria-label="‘${esc(x)}’ 최근 검색에서 지우기">${I.x}</button></div>`));
+          rq.forEach((x) => parts.push(`<div class="optrow" role="none"><a class="opt" role="option" href="#/search?q=${q2(x)}">${I.clock}<span>${esc(x)}</span></a><button type="button" class="rq-del" data-rq="${esc(x)}" tabindex="-1" aria-hidden="true" title="최근 검색에서 지우기">${I.x}</button></div>`));
         }
         if (sv.length) {
           parts.push(`<span class="grp${rq.length ? ' sep' : ''}" role="presentation">저장한 절</span>`);
@@ -1725,6 +1713,8 @@
     }
     // 목록을 누르는 동안 검색칸 초점을 지킨다(최근 검색 지우기 단추가 목록을 닫지 않게)
     box.addEventListener('mousedown', (e) => { if (e.target.closest('.rq-del')) e.preventDefault(); });
+    // 목록에서 검색어(최근 검색 포함)를 고르면 최근 검색에 남긴다
+    box.addEventListener('click', (e) => { const a = e.target.closest('a.opt'); const m = a && (a.getAttribute('href') || '').match(/^#\/search\?q=([^&]*)/); if (m) rqAdd(decodeURIComponent(m[1])); });
     box.addEventListener('click', (e) => {
       const d = e.target.closest('.rq-del');
       if (!d) return;
@@ -1754,9 +1744,19 @@
         list.forEach((o, i) => o.setAttribute('aria-selected', String(i === sel)));
         if (list[sel]) input.setAttribute('aria-activedescendant', list[sel].id); else input.removeAttribute('aria-activedescendant');
         if (list[sel]) list[sel].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Delete' && sel >= 0 && list[sel] && list[sel].closest('.optrow')) {   // 고른 최근 검색을 Delete 키로 지운다
+        e.preventDefault();
+        const d = list[sel].closest('.optrow').querySelector('.rq-del');
+        if (d) {   // 지운 뒤에도 같은 자리(또는 마지막) 항목을 고른 채로 — 다시 ↓를 누르지 않게
+          const keep = sel;
+          rqDel(d.dataset.rq); update();
+          const nl = opts();
+          if (!box.hidden && nl.length) { sel = Math.min(keep, nl.length - 1); nl.forEach((o, i) => o.setAttribute('aria-selected', String(i === sel))); input.setAttribute('aria-activedescendant', nl[sel].id); }
+        }
       } else if (e.key === 'Enter' && sel >= 0 && list[sel]) {
         e.preventDefault();
         const href = list[sel].getAttribute('href');   // close()가 sel을 -1로 되돌리므로 먼저 읽는다
+        const mq = href.match(/^#\/search\?q=([^&]*)/); if (mq) rqAdd(decodeURIComponent(mq[1]));
         close(); location.hash = href;
       } else if (e.key === 'Escape') {
         // 목록만 닫는다: 브라우저가 검색칸 글자를 지우거나, 옆의 원문 창까지 닫히지 않게
@@ -1765,6 +1765,14 @@
     });
   }
 
+  // 찾기 칸을 닫고 초점은 보이는 ⋯ 단추로(폰은 머리줄, 넓은 화면은 본문 도구)
+  function closeFindbar() {
+    const b = app.querySelector('.findbar');
+    if (b) b.remove();
+    document.documentElement.classList.remove('has-findbar');
+    const t = [...app.querySelectorAll('.rhead [data-act="rmenu"], .tmore [data-act="rmenu"]')].find((x) => x.offsetParent !== null);
+    if (t) t.focus();
+  }
   /* ---------------- 이벤트 ---------------- */
   // 폰: 아래로 내리면 하단 탭을 숨겨 읽을 자리를 넓히고, 위로 조금만 올리거나 맨 위·맨 끝에 닿으면 다시 보인다
   (() => {
@@ -1776,7 +1784,7 @@
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        if (wide(700) || root.classList.contains('sheet-open')) { set(false); lastY = window.scrollY; return; }
+        if (wide(700) || root.classList.contains('sheet-open') || performance.now() < navHoldUntil) { set(false); lastY = window.scrollY; return; }
         const y = window.scrollY, dy = y - lastY;
         const atEnd = y + window.innerHeight >= root.scrollHeight - 8;
         if (y < 64 || atEnd) set(false);
@@ -1802,7 +1810,12 @@
       e.preventDefault();
       const v = fb.q.value.trim();
       if (!v) { fb.q.focus(); return; }
-      location.replace(`#/s/${fb.dataset.id}?q=${q2(v)}`);
+      // 기록 항목은 그대로 두고 주소만 바꾼 뒤 다시 그린다(location.replace는 history.state를 지워 '뒤로' 깊이가 틀어진다)
+      try { history.replaceState(history.state, '', `#/s/${fb.dataset.id}?q=${q2(v)}`); } catch (err) { /* 무시 */ }
+      render(location.hash);
+      // 다시 그리면 찾기 칸이 사라지므로 초점은 '다음 일치' 단추로(없으면 제목으로)
+      const nx = app.querySelector('.hitnav [data-act="hit-next"]') || app.querySelector('h1');
+      if (nx) { if (nx.tagName === 'H1') nx.setAttribute('tabindex', '-1'); nx.focus({ preventScroll: true }); }
       return;
     }
     const form = e.target.closest('form[data-form="search"]');
@@ -1811,6 +1824,7 @@
     const q = form.q.value.trim();
     const scope = form.scope.value;
     if (!q) return;
+    rqAdd(q);   // 최근 검색은 사용자가 직접 찾은 것만(공유 링크로 열린 검색은 남기지 않는다)
     const num = idx.byNumber(q);
     if (num.length === 1) { location.hash = `#/s/${num[0].id}`; return; }
     if (scope === 'table') location.hash = `#/tables?q=${q2(q)}`;
@@ -1931,9 +1945,10 @@
         app.appendChild(bar);
       }
       bar.querySelector('input').focus();
+      document.documentElement.classList.add('has-findbar');
       return;
     }
-    if (act === 'findbar-close') { const b = app.querySelector('.findbar'); if (b) b.remove(); const t = app.querySelector('.rhead [data-act="rmenu"], .tmore [data-act="rmenu"]'); if (t && t.offsetParent) t.focus(); return; }
+    if (act === 'findbar-close') { closeFindbar(); return; }
     if (act === 'linkcopy') { copyText(location.href, '링크를 복사했습니다'); return; }
     if (act === 'fac-retry') { facLoading = null; render(location.hash); const b = app.querySelector('.facload'); if (b) { b.setAttribute('tabindex', '-1'); b.focus(); } return; }
     if (act === 'fac-more') {   // 펴 둔 카드(주소의 id)를 그대로 두고 다음 50곳
@@ -2029,14 +2044,7 @@
       toast('저장을 지웠습니다');
       return;
     }
-    if (act === 'mytab') {
-      const key = el.dataset.tab;
-      store.set('krc.mytab', key);
-      const box = el.closest('.mine');
-      box.querySelectorAll('[data-act="mytab"]').forEach((t) => t.setAttribute('aria-pressed', String(t === el)));
-      box.querySelectorAll('.mpanel').forEach((pn) => { pn.hidden = pn.id !== `mp-${key}`; });
-      return;
-    }
+    // (홈의 '저장한 절/최근 본 절' 고르기는 홈 단순화로 없어졌다)
     if (act === 'search-jump') {
       const inp = [...app.querySelectorAll('form[data-form="search"] input[name="q"]')].find((x) => x.offsetParent !== null);
       e.preventDefault();
@@ -2143,7 +2151,7 @@
     }
     if (e.key === 'Escape' && sheetEl()) { e.preventDefault(); closeSheet(); dropLayer('sheet'); return; }
     if (e.key === 'Escape' && app.querySelector('.rmenu:not([hidden])')) { e.preventDefault(); closeMenu(true); return; }
-    if (e.key === 'Escape' && e.target.closest && e.target.closest('.findbar')) { e.preventDefault(); app.querySelector('.findbar').remove(); return; }
+    if (e.key === 'Escape' && e.target.closest && e.target.closest('.findbar')) { e.preventDefault(); closeFindbar(); return; }
     if (detailEl()) {
       if (e.key === 'Escape') { e.preventDefault(); closeDetail(); dropLayer('detail'); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); detailGo(e.key === 'ArrowRight' ? 1 : -1); }
