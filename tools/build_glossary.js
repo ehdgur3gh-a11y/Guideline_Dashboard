@@ -22,7 +22,7 @@ const LEAD = /^(?:이와 같이|이와 같은|이러한|그러나|그러므로|�
 // 사람이 걸러 낸 것 (검토 6·9차): 정의가 아닌데 꼴이 맞아 걸린 말
 const DROP = new Set(['기타', '시행전 분석방향', '적산', '깬자갈 생산준비', '대상지구의 유역', '담수화 과정', '개발면적',
   '간척 및 매립', '간석지 및 간척지', '산의 높이', '1Lugeon', '간출암의 높이', '환경보전비산출', '활성화', '초과하는 확률이므로 위험도', '위험도',
-  '구성', '구획계획', '포장의 구획', '입구에 설치', '총칭하여 외압', 'logCv−logP 곡선', '부진동', '급조', '동상방지층', '공사의 예정가격', '견적가격', '내용적',
+  '구성', '구획계획', '격조', '등조시도', '양흡입형', '포장의 구획', '입구에 설치', '총칭하여 외압', 'logCv−logP 곡선', '부진동', '급조', '동상방지층', '공사의 예정가격', '견적가격', '내용적',
   // 수식 기호 설명·산출식·항목 나열·법령 조항
   '계상기준', '계약서 근거에 의하는 비목', '계획배수로 제원', '고용보험료산출', '국민건강보험료산출', '국민연금보험료산출', '노인장기요양보험료산출',
   '농어촌 도로의 구조‧시설기준', '도로망 조사', '도로의 구조‧시설기준', '목 적', '법령에 의해 산출하는 비목', '비산먼지 방지시설', '사석재 통과량을 고려할 경우',
@@ -34,6 +34,17 @@ const TERM_FIX = { '총칭하여 연결수로': '연결수로', 'A군': '수문�
   '처리': '폐기물 처리', '처분': '폐기물 처분', '견적가격 또는 입찰가격': '견적가격' };
 const ALT_FIX = { 'High water ordinary meaan tide': 'High water ordinary mean tide', 'Low water ordinary mean Ttde': 'Low water ordinary mean tide', 'Approx, lowest low water level': 'Approx. lowest low water level' };
 const KEEP_LATIN = new Set(['CFRD']);
+// 정의 글을 사람이 고친 것: '용어|절' → 글 (원문이 앞 항목·앞 문장을 가리켜 혼자 읽히지 않는 경우)
+const DEF_FIX = {
+  '복합 드레인|1-4.2.3': '하류 비탈끝 드레인, 수평 드레인, 직립 드레인을 조합한 드레인을 말한다.',
+  '대조차|4-4.3.1': '대조 때 조차의 평균을 대조차(Spring range)라 한다.',
+  '소조차|4-4.3.1': '소조 때 조차의 평균을 소조차(Neap range)라 한다.',
+};
+// 규칙으로는 못 잡지만 용어 절에 분명히 있는 것 [용어, 다른 이름, 정의(원문), 절, 블록]
+const EXTRA = [
+  ['하류 비탈끝 드레인', 'Toe Drain', '외측사면의 끝에 설치한 드레인으로 토우드레인(Toe Drain)이라고 한다.', '1-4.2.3', 94],
+  ['직립 드레인', '', '직립 부분은 존형에서 불투수성부의 양측 또는 외제측에 위치하는 경우 단순히 수직휠터라 하고, 균일형 댐의 중앙부에 설치한 경우에는 차단층(Intercepter)이라 한다.', '1-4.2.3', 96],
+];
 
 function splitTerm(raw) {
   let t = clean(raw).replace(/\s*\((?:이하|이하에서)[^)]*\)?/g, '').replace(/[,·]$/, '');
@@ -56,7 +67,7 @@ const seen = new Set();
 function add(rule, s, bi, rawTerm, def) {
   const { t, alt } = splitTerm(rawTerm);
   if (!ok(t) || DROP_DEF.has(t + '|' + s.id)) return;
-  def = firstSentence(clean(def).replace(LEAD, ''));
+  def = DEF_FIX[t + '|' + s.id] || firstSentence(clean(def).replace(LEAD, '').replace(/^\[그림[^\]]*\]과 같이\s*/, ''));
   if (def.length < 8) return;
   const key = S.norm(t) + '|' + s.id;
   if (seen.has(key)) return;
@@ -97,6 +108,8 @@ for (const v of window.KRC_DATA.vols) for (const s of v.sections) {
     }
   });
 }
+
+EXTRA.forEach(([t, alt, d, id, bi]) => { if (!out.some((e) => e.t === t)) out.push({ t, alt, d, id, bi, rule: 'X' }); });
 
 // RAWRIS '농업생산기반시설 용어' (https://rawris.ekr.or.kr/facilities.do?page=facilities_terms) — 한국농어촌공사
 const RAWRIS = [
