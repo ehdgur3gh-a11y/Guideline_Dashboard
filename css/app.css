@@ -995,3 +995,26 @@ html.has-findbar .totop { display: none; }   /* 찾기 칸이 '위로' 단추를
   .hero .in2 { margin-top: 0; }
   .hero .band::before, .hero .band::after { display: none; }
 }
+
+/* ---------- 검토 21차: 실제 폰 브라우저(아이폰 사파리·삼성 인터넷·안드로이드)에서 깨지지 않게 ---------- */
+/* 브라우저가 입력칸·선택칸·단추에 입히는 기본 모양(회색 둥근 상자·기본 화살표·안쪽 그림자)을 끈다 */
+input[type="search"], input[type="text"], select, button { -webkit-appearance: none; appearance: none; }
+input[type="search"]::-webkit-search-decoration, input[type="search"]::-webkit-search-results-button, input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; }
+input[type="checkbox"] { -webkit-appearance: auto; appearance: auto; accent-color: var(--primary); }   /* 편 고르기 체크칸은 기본 모양 그대로 */
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235B6672' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 14px; padding-right: 30px !important; }
+.sbox select { background-color: transparent; padding-right: 26px !important; background-position: right 6px center; }
+.sel2 select, .toc select { background-color: var(--surface); }
+/* 아이패드 사파리는 16px보다 작은 글자의 칸을 누르면 화면을 확대한다 */
+input, select, textarea { font-size: max(1rem, 16px); }
+.sbox input { font-size: max(1.0625rem, 16px); }
+/* 누를 때 번쩍이는 파란 상자·글자 키움(안드로이드 크롬의 자동 글자 확대)을 막는다 */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; color-scheme: only light; }
+a, button, summary, label, [data-act] { -webkit-tap-highlight-color: transparent; }
+/* inset을 모르는 옛 사파리용 */
+#splash, .sheet-wrap, .sheet-bg, .pdfzoom { top: 0; right: 0; bottom: 0; left: 0; }
+.sbox select, .sel2 select, .toc select, .tv-find input, .findbar input { font-size: max(1rem, 16px); }
+/* 선택칸 화살표: 앞의 background 줄임 규칙에 덮이지 않게 */
+select, .sbox select, .sel2 select, .toc select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235B6672' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important; background-size: 14px !important; background-position: right 10px center !important; }
+.sbox select { background-position: right 6px center !important; }

@@ -1194,6 +1194,7 @@
   function viewTable(id, bi) {
     const s = idx.byId.get(id);
     const b = s && s.blocks[+bi];
+    if (!b || b.t !== 'table') document.title = '표를 찾을 수 없습니다 — 조사설계실무요령';
     if (!b || b.t !== 'table') return topbar('', 'all', 'tables') + `<main id="main" class="page"><div class="empty card"><p>표를 찾을 수 없습니다.</p><p>${s ? `<a href="#/s/${s.id}">${esc(s.num)} ${esc(s.title)} 본문 보기</a> · ` : ''}<a href="#/tables">표 모음 보기</a></p></div></main>${bottomnav('tables')}`;
     document.title = `${b.caption || '표'} — 조사설계실무요령`;
     const tvCards = tableCards(b, []);
@@ -1530,7 +1531,10 @@
   function render(hash) {
     const { parts, params } = parseHash(typeof hash === 'string' ? hash : undefined);
     if (askCtl) { askCtl.abort(); askCtl = null; }   // 화면을 떠나면 진행 중인 답변 요청을 끊는다
-    document.documentElement.classList.remove('nav-hidden', 'has-findbar');   // 새 화면에서는 하단 탭을 다시 보인다(찾기 칸은 다시 그리면 없어진다)
+    document.documentElement.classList.remove('nav-hidden', 'has-findbar');
+    // 휴대폰 주소창·상태 표시줄 색: 홈은 청색 머리와 같게, 나머지는 미색 바탕과 같게
+    const tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', parts[0] ? '#F6F5F1' : '#00285A');   // 새 화면에서는 하단 탭을 다시 보인다(찾기 칸은 다시 그리면 없어진다)
     navHoldUntil = performance.now() + 700;   // 그린 직후 앱이 스스로 옮기는 스크롤(뒤로 위치 복원·찾은 말로 이동)에는 숨기지 않는다
     let html;
     switch (parts[0]) {
