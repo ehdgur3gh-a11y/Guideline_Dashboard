@@ -1018,3 +1018,9 @@ a, button, summary, label, [data-act] { -webkit-tap-highlight-color: transparent
 select, .sbox select, .sel2 select, .toc select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235B6672' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important; background-size: 14px !important; background-position: right 10px center !important; }
 .sbox select { background-position: right 6px center !important; }
+
+/* 22차: 시설 카드 펼침 화살표 — 글자 위에 떠 있지 않게 카드 오른쪽 칸에 세로 가운데로 */
+.faclist summary { grid-template-columns: 40px minmax(0, 1fr) 16px; }
+.faclist summary::after { position: static; grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-self: center; margin: 0 0 4px; }
+.faclist details[open] > summary::after { margin: 4px 0 0; }
+.faclist .fh { padding-right: 0; }
