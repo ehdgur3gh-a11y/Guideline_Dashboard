@@ -1024,3 +1024,58 @@ select, .sbox select, .sel2 select, .toc select { background-image: url("data:im
 .faclist summary::after { position: static; grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-self: center; margin: 0 0 4px; }
 .faclist details[open] > summary::after { margin: 4px 0 0; }
 .faclist .fh { padding-right: 0; }
+
+/* 23차: 폰 머리줄 자동완성 목록을 화면 폭(좌우 12px)으로 — 검색칸 폭(글자 크기 단추 제외)에 갇혀 절 제목이 2~3줄로 꺾이지 않게 */
+@media (max-width: 700px) {
+  .topbar .in { position: relative; }
+  .topbar .searchbar { position: static; }
+  .topbar .ac { left: 12px; right: 12px; top: calc(100% - 2px); }
+}
+/* 23차: 표 보기 화면에서도 화면보다 넓은 표에 '옆으로 밀어 보세요' 안내 */
+.tv-wrap.wide-tbl::before { content: '표가 화면보다 넓습니다 — 옆으로 밀어 보세요 →'; position: sticky; left: 0; display: block; width: max-content; max-width: 100%; padding: 4px 10px; font-size: 0.9375rem; color: var(--muted); background: var(--surface-2); }
+@media print { .tv-wrap.wide-tbl::before { display: none !important; } }
+/* 23차: 좁은 폰·큰 글자에서 검색칸 안내 글이 글자 중간에서 잘리지 않고 '…'로 끝나게 */
+.sbox input, .tv-find input, .facform input, .findbar input { text-overflow: ellipsis; }
+/* 23차: 표·시설 찾기 칸이 '아주 크게'+320px에서 화면 밖으로 1px 밀리지 않게 */
+.tv-find { min-width: 0; }
+.tv-find input { min-width: 0; }
+/* 23차: 시설은 찾았고 본문에만 없을 때의 한 줄 안내 */
+.noresult-mini { margin: 0; padding: 4px 2px; color: var(--muted); font-size: 0.9375rem; text-align: left; }
+.noresult-mini a { white-space: nowrap; }
+
+/* 24차: CSS 검토에서 확인한 것 */
+/* 긴 한 낱말 제목이 320px에서 카드·자동완성 목록을 옆으로 밀지 않게(제목 쪽이 줄어들고 편·쪽은 그대로) */
+.results .ttl a { min-width: 0; overflow-wrap: break-word; }
+.ac .opt:not(.tm) { flex-wrap: wrap; }   /* 자리가 모자라면 편·쪽이 다음 줄로(제목 낱말이 중간에서 꺾이지 않게) */
+.ac .opt > span:not(.where):not(.num):not(.tag) { min-width: 0; flex: 1 1 auto; overflow-wrap: break-word; }
+.ac .opt .where { flex: none; }
+/* 머리줄 검색칸에 초점이 오면 분명한 청색 테(전에는 연한 테라 거의 안 보였다) — 홈 검색칸은 따로 그림자까지 */
+.sbox:focus-within { box-shadow: 0 0 0 3px var(--primary); }
+/* 방향키로 고른 자동완성 항목이 보이게(미색 바탕은 흰 바탕과 거의 같았다) */
+.ac .opt[aria-selected="true"] { background: var(--primary-5); box-shadow: inset 3px 0 0 var(--primary); }
+/* 찾기 칸이 맨 아래 내용(이전·다음)을 가리지 않게 */
+html.has-findbar body { padding-bottom: 96px; }
+@media (max-width: 700px) {
+  html.has-findbar body { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+  html.has-findbar.has-hitbar body { padding-bottom: calc(212px + env(safe-area-inset-bottom)); }
+  /* 하단 탭 이름은 글자 크기를 키워도 한 줄·같은 크기(두 줄이 되면 탭이 높아져 찾은 말 막대·찾기 칸과 겹친다) */
+  .bottomnav a { white-space: nowrap; font-size: min(0.9375rem, 15px); }
+  /* 검색 범위 고르기: 글자 크기에 맞춰 넓어지게(큰 글자에서 '통합'이 잘리지 않게) */
+  .sbox select { max-width: 4.8em; }
+  /* 알림이 찾은 말 막대 위에 겹치지 않게 */
+  html.has-hitbar #toast { bottom: calc(146px + env(safe-area-inset-bottom)); }
+  html.nav-hidden.has-hitbar #toast { bottom: calc(78px + env(safe-area-inset-bottom)); }
+}
+/* 아이폰 가로: 둥근 모서리·노치에 닫기 단추·맨 위로 단추가 들어가지 않게 */
+.pp-head { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+.pz-head { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.totop { right: max(16px, calc(4px + env(safe-area-inset-right))); }
+@media (max-width: 1100px) {
+  .pp-head { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  .pz-head { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+}
+@media (max-width: 700px) { .totop { right: 12px; } }
+/* inset을 모르는 옛 사파리에서도 원문 창이 화면을 채우게 */
+@media (max-width: 1100px) { .pdfpane { top: 0; right: 0; bottom: 0; left: 0; } }
+/* 폰에서 작은 칩(예시 검색어·업무 흐름 바로가기·시설 종류 바로가기)도 누르기 쉽게 40px */
+@media (max-width: 700px) { .tchip, .hero .ex .tchip, .step .out, .fachit .types a { min-height: 40px; } }
