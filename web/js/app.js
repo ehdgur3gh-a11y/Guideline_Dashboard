@@ -84,10 +84,12 @@
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; }
     catch (e) {
+      const back = document.activeElement;   // 복사 뒤 초점을 누른 단추로 되돌린다(임시 글상자를 지우면 초점이 맨 앞으로 간다)
       const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.focus(); ta.select();
       try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
       ta.remove();
+      if (back && back.isConnected && back.focus) back.focus({ preventScroll: true });
     }
     toast(ok ? (msg || '복사했습니다') : '복사하지 못했습니다 — 글을 직접 선택해 복사하세요');
   }
@@ -482,7 +484,7 @@
     return `<form class="searchbar" role="search" data-form="search" autocomplete="off">
       <div class="sbox">
         <label class="sr" for="scope-${big ? 'h' : 't'}">검색 범위</label>
-        <select id="scope-${big ? 'h' : 't'}" name="scope">${opt('all', '통합')}${opt('title', '절 번호·제목')}${opt('body', '본문')}${opt('table', '표')}</select>
+        <select id="scope-${big ? 'h' : 't'}" name="scope">${opt('all', '통합')}${opt('title', '제목')}${opt('body', '본문')}${opt('table', '표')}</select>
         <label class="sr" for="q-${big ? 'h' : 't'}">검색어 또는 절 번호</label>
         <input id="q-${big ? 'h' : 't'}" name="q" type="search" value="${esc(q || '')}" placeholder="${!wide(420) ? '검색어·절 번호' : !wide(700) ? '검색어 또는 절 번호' : FEATURES.ask ? '검색어, 절 번호 또는 질문을 입력하세요' : '검색어나 절 번호를 입력하세요 (문장으로 써도 됩니다)'}" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ac-${big ? 'h' : 't'}" aria-autocomplete="list">
         <button type="submit" aria-label="검색">${I.search}<span class="bt">검색</span></button>
@@ -596,7 +598,7 @@
 
   /* ---------------- 검색결과 ---------------- */
   function viewSearch(params) {
-    const q = params.get('q') || '';
+    const q = (params.get('q') || '').trim();   // 공유 링크에 붙은 앞뒤 빈칸은 떼고 보인다
     const scope = params.get('scope') || 'all';
     const page = Math.max(1, parseInt(params.get('page'), 10) || 1);   // 'page=x' 같은 잘못된 값은 1쪽
     const vols = new Set((params.get('v') || '').split(',').filter(Boolean).map(Number));
@@ -638,15 +640,23 @@
           ${snips}
         </div><button type="button" class="icon-btn" data-act="cite" data-id="${s.id}" aria-label="출처 복사" title="출처 복사">${I.copy}</button></li>`;
     }).join('');
+    // 시설은 찾았고 본문에만 없을 때: 큰 '결과 없음' 상자 대신 한 줄 — 찾던 것(시설)이 바로 보이게
+    const emptyMini = `<p class="empty noresult-mini">실무요령 본문에는 ‘${esc(q)}’이(가) 나오지 않습니다. <a href="#/terms?q=${q2(q)}">용어 사전에서 찾기</a></p>`;
     // 시설 이름('용천저수지')이면 맨 위에 시설정보 카드 — 시설 자료(445KB)는 결과가 없거나 시설 종류 말이 들어 있을 때만 받는다
     const wantFac = scope !== 'body' && (vTotal === 0 || FAC_WORD.test(q));
     if (wantFac && !window.KRC_FAC) {
       loadFac().then(() => {
         const slot = app.querySelector('[data-slot="fachit"]');
-        if (slot && parseHash().params.get('q') === q) slot.outerHTML = facHitHtml(q);
+        if (slot && (parseHash().params.get('q') || '').trim() === q) {
+          const fh = facHitHtml(q);
+          slot.outerHTML = fh;
+          const nr = fh && app.querySelector('.noresult');   // 시설은 찾았으면 '본문에 없음'은 한 줄로 줄인다
+          if (nr) nr.outerHTML = emptyMini;
+        }
       }, () => { /* 못 받으면 카드 없이 */ });
     }
     const facSlot = wantFac ? (window.KRC_FAC ? facHitHtml(q) : '<div data-slot="fachit"></div>') : '';
+    const facFound = !!facSlot && !facSlot.startsWith('<div data-slot');
     const nothing = !vTotal && !numCards && !defHit;
     const filteredOut = !r.hits.length && vTotal > 0;   // 고른 편에만 없을 때(옛 주소 등)
     const emptyHtml = `<section class="empty card noresult"><p class="big">실무요령 본문에서 ‘${esc(q)}’을(를) 찾지 못했습니다</p>
@@ -662,7 +672,7 @@
         ${vchips}${sumLine}
         <div class="summary"><span class="muted">${r.total}문단에서 찾음</span>${notes.join('')}</div>
         ${facSlot}${defHit ? defCard(defHit) : ''}${numCards}${titleCards}
-        ${items ? `<ol class="results">${items}</ol>${more}` : nothing ? emptyHtml : filteredOut ? `<p class="empty card">고른 편에는 ‘${esc(q)}’이(가) 없습니다. <a href="${vHref(0)}">전체 편에서 보기 (${vTotal}개 절)</a></p>` : ''}
+        ${items ? `<ol class="results">${items}</ol>${more}` : nothing ? (facFound ? emptyMini : emptyHtml) : filteredOut ? `<p class="empty card">고른 편에는 ‘${esc(q)}’이(가) 없습니다. <a href="${vHref(0)}">전체 편에서 보기 (${vTotal}개 절)</a></p>` : ''}
       </div>
       <aside class="side">
         ${FEATURES.ask ? `<a class="card titlehit" style="background:var(--surface)" href="#/ask?q=${q2(q)}"><span class="k">${I.ask} 질문으로 찾기</span><span>${esc(q)}</span></a>` : ''}
@@ -970,6 +980,7 @@
   }
   function viewReader(id, params) {
     const s = idx.byId.get(id);
+    if (!s) document.title = '절을 찾을 수 없습니다 — 조사설계실무요령';
     if (!s) return topbar('', 'all', 'toc') + `<main id="main" class="page"><div class="empty card"><p>해당 절을 찾을 수 없습니다. 주소가 바뀌었거나 잘못 입력되었을 수 있습니다.</p><p><a href="#/s/1-ch1">전체 목차 보기</a> · <a href="#/">처음으로</a></p></div></main>${bottomnav('toc')}`;
     const v = volOf(s);
     const q = params.get('q') || '';
@@ -1289,10 +1300,13 @@
   }
 
   /* ---------------- 시설정보 (web/data/fac.js — 공공데이터포털 시설제원, 처음 열 때 불러온다) ---------------- */
-  let facLoading = null;
-  function loadFac() {
+  let facLoading = null, facFailAt = 0;
+  function loadFac(force) {
     if (window.KRC_FAC) return Promise.resolve();
-    if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js'; sc.onload = res; sc.onerror = () => { facLoading = null; rej(); }; document.head.appendChild(sc); });
+    // 방금(30초 안) 실패했으면 글자를 칠 때마다 다시 받으려 하지 않는다(오프라인에서 script가 쌓이지 않게) — '다시 시도'는 force
+    if (!force && !facLoading && facFailAt && performance.now() - facFailAt < 30000) return Promise.reject(new Error('fac'));
+    // 받았는데 자료가 없으면(중간 서버가 HTML을 돌려준 경우 등) 실패로 — 성공으로 보면 시설 화면이 끝없이 다시 그려져 멈춘다
+    if (!facLoading) facLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'data/fac.js'; const fail = () => { facLoading = null; facFailAt = performance.now(); sc.remove(); rej(); }; sc.onload = () => (window.KRC_FAC ? res() : fail()); sc.onerror = fail; document.head.appendChild(sc); });
     return facLoading;
   }
   const FAC_WORD = /저수지|양수장|배수장|양배수장|취입보|방조제|관정|집수암거/;   // '지구'는 흔한 말이라 빼서 쓸데없이 시설 자료(445KB)를 받지 않게
@@ -1339,7 +1353,8 @@
           return;
         }
         render(location.hash);
-        const h = app.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+        const fs = app.querySelector('[data-focus] summary');   // 링크로 온 시설 카드면 그 카드에 초점(화면도 거기로 내려가 있다)
+        const h = fs || app.querySelector('h1'); if (h) { if (!fs) h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
       };
       loadFac().then(done, () => {   // 받지 못하면(오프라인 등) 멈춰 있지 않고 알리고 다시 시도
         const box = app.querySelector('.facload');
@@ -1348,7 +1363,12 @@
       return topbar('', 'all', 'fac') + `<main id="main" class="page"><div class="main fac-page"><div class="pagehead"><p class="eyebrow">FACILITIES</p><h1>시설정보</h1></div><div class="facload boot" role="status">시설 자료를 불러오는 중…</div></div></main>${bottomnav('fac')}`;
     }
     const F = window.KRC_FAC;
-    const type = F.types.find((t) => t.key === params.get('t')) || F.types[0];
+    // 종류(t)가 없는 주소('#/fac?q=해포도'): 그 시설(id)이 든 종류, 아니면 이름·주소가 맞는 첫 종류로 — 늘 저수지로 열려 '없습니다'가 뜨지 않게
+    const nq0 = S.norm((params.get('q') || '').trim()), id0 = params.get('id') || '';
+    const type = F.types.find((t) => t.key === params.get('t'))
+      || (id0 && F.types.find((t) => t.rows.some((r) => r[0] === id0)))
+      || (nq0 && F.types.find((t) => t.rows.some((r) => S.norm(r[1]).includes(nq0) || S.norm(r[2]).includes(nq0))))
+      || F.types[0];
     const sido0 = params.get('sido') || '';
     const sidos = [...new Set(F.types.flatMap((t) => t.rows.map((r) => r[3])).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
     const sido = sidos.includes(sido0) ? sido0 : '';   // 목록에 없는 시도(옛 이름 등)는 무시 — 고르기 칸과 결과가 어긋나지 않게
@@ -1364,7 +1384,11 @@
     const hit = (r) => (!sido || r[3] === sido) && (!sgg || r[4] === sgg) && (!nq || S.norm(r[1]).includes(nq) || S.norm(r[2]).includes(nq) || S.norm(r[3] + r[4]).includes(nq));
     const rows = type.rows.filter((r) => hit(r) && (!sub || r[7] === sub || r[7] === '양배수'));
     if (sub) rows.sort((a, b) => (a[7] === sub ? 0 : 1) - (b[7] === sub ? 0 : 1));   // '배수장'을 고르면 배수 전용을 먼저, 양배수 겸용은 뒤에
-    const per = 50, shown = rows.slice(0, page * per);
+    const per = 50;
+    // 주소의 시설(id)이 이 쪽 목록 밖이면 맨 앞으로 — 링크로 와서 열린 카드가 안 보이는 일이 없게(render가 그 카드로 내려 준다)
+    const oi = open ? rows.findIndex((r) => r[0] === open) : -1;
+    if (oi >= per) rows.unshift(rows.splice(oi, 1)[0]);   // 첫 쪽 밖이면 늘 맨 앞(더 보기로 쪽이 늘어도 순서가 바뀌지 않게)
+    const shown = rows.slice(0, page * per);
     const ki = type.cols.findIndex(([n]) => n === FAC_KEY_STAT[type.key]);
     const P = F.present;
     const link = (o) => `#/fac?${new URLSearchParams(Object.assign({ t: type.key }, sido ? { sido } : {}, sgg ? { sgg } : {}, q ? { q } : {}, sub ? { sub } : {}, o))}`;
@@ -1376,7 +1400,7 @@
       const warn = new Set(r[11] || []);
       const specs = type.cols.map(([n, u], i) => (r[10][i] == null || r[10][i] === 0 || r[10][i] === '' ? '' : `<div${warn.has(i) ? ' class="warn"' : ''}><dt>${esc(n)}</dt><dd>${fmtNum(r[10][i])}${u ? ` <small>${esc(u)}</small>` : ''}${warn.has(i) ? ' <small class="wn">원자료 값 — 확인 필요</small>' : ''}</dd></div>`)).join('');
       const g = guideOf(r);
-      return `<li><details${open === r[0] ? ' open' : ''}><summary>
+      return `<li${open === r[0] ? ' data-focus="1"' : ''}><details${open === r[0] ? ' open' : ''}><summary>
           <span class="fav" aria-hidden="true">${I.dam}</span><span class="fh"><strong>${esc(r[1])}</strong><span class="muted">${esc(type.label)}${r[7] ? `(${esc(r[7])})` : ''} · ${esc(r[6] || '')}</span>${stat ? `<span class="st">${stat}</span>` : ''}</span>
           <span class="muted fa">${esc(r[2])}${r[5] ? ` · ${esc(r[5])}년 준공` : ''}</span>
         </summary>
@@ -1589,7 +1613,12 @@
       // 편 칩·필터를 바꾼 경우는 고른 칩에, '더 보기'면 새로 나온 첫 항목에
       const next = after || keep && (keep.vol ? app.querySelector(`[data-vol="${keep.vol}"]`) : keep.more ? app.querySelector(`ol.results > li:nth-child(${keep.count + 1}) .ttl a, .faclist > li:nth-child(${keep.count + 1}) summary`) : [...app.querySelectorAll('.vchips [aria-current], .chips [aria-current]')].find((x) => x.offsetParent !== null));
       const h1 = app.querySelector('h1');
+      // 링크로 온 용어·시설 카드(data-focus)는 화면도 거기로 내려가니 초점도 거기에 — Tab이 맨 위로 튀지 않게
+      const fz0 = !keep && !back && app.querySelector('[data-focus]');
+      const fzt = fz0 && (fz0.querySelector('summary') || fz0);
+      if (fzt && !next && fzt === fz0) fzt.setAttribute('tabindex', '-1');
       if (next) next.focus({ preventScroll: true });
+      else if (fzt) fzt.focus({ preventScroll: true });
       else if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
     }
     rendered = true;
@@ -1602,7 +1631,7 @@
       if (ps && paneWanted() && canPane(ps)) openPane(ps, parts[0] === 't' ? ((ps.pdf_blocks && ps.pdf_blocks[+parts[2]]) || ps.pdf) : ps.pdf);
     }
     if (back) { window.scrollTo(0, restoreTo); setTimeout(() => window.scrollTo(0, restoreTo), 0); }   // 글꼴·표가 자리 잡은 뒤 한 번 더
-    else {   // 용어 사전 '#/terms?t=용어': 그 용어로
+    else if (!keep) {   // 용어 사전 '#/terms?t=용어'·시설 카드 링크: 그 카드로('더 보기'로 다시 그릴 때는 제자리)
       const fz = app.querySelector('[data-focus]');
       if (fz) { fz.scrollIntoView({ block: 'start' }); window.scrollBy(0, -8); fz.classList.add('flash'); }
     }
@@ -1615,6 +1644,7 @@
     app.querySelectorAll('.content .tblwrap').forEach((w) => {
       w.parentElement.classList.toggle('wide-tbl', w.scrollWidth > w.clientWidth + 2);
     });
+    app.querySelectorAll('.tv-wrap').forEach((w) => { w.classList.toggle('wide-tbl', w.scrollWidth > w.clientWidth + 2); });   // 표 보기 화면
   }
   let wideTimer = 0;
   window.addEventListener('resize', () => { clearTimeout(wideTimer); wideTimer = setTimeout(markWide, 150); });
@@ -1739,7 +1769,8 @@
     input.addEventListener('focus', () => update());
     input.addEventListener('blur', () => setTimeout(close, 150));
     input.addEventListener('keydown', (e) => {
-      if (box.hidden || e.isComposing || e.keyCode === 229) return;   // 한글 조합 중의 ↑↓·Enter는 글자 입력용
+      if (e.isComposing || e.keyCode === 229) return;   // 한글 조합 중의 ↑↓·Enter는 글자 입력용
+      if (box.hidden) { if (e.key === 'ArrowDown') { e.preventDefault(); update(); } return; }   // Esc로 닫은 뒤 ↓로 다시 연다
       const list = opts();
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -1887,12 +1918,24 @@
   app.addEventListener('input', (e) => {
     if (!e.target.matches('[data-act="tfilter"]')) return;
     const n = S.norm(e.target.value);
-    app.querySelectorAll('#tv tr').forEach((tr, i) => { tr.classList.toggle('hide', i > 0 && n && !S.norm(tr.textContent).includes(n)); });
+    // 제목줄은 첫 줄 칸의 rowspan만큼(두 줄짜리 제목도 남긴다). 합친 칸(rowspan)이 있는 표는
+    // 맞는 줄의 합친 칸이 시작하는 줄(앵커)도 보이고, 합친 칸 글에 맞으면 그 칸이 덮는 줄을 모두 보인다 — 칸이 옆으로 밀려 엉뚱한 열 밑에 서지 않게
+    const trs = [...app.querySelectorAll('#tv tr')];
+    const hr = trs.length > 1 ? Math.max(1, ...[...trs[0].cells].map((c) => c.rowSpan || 1)) : 0;
+    const match = trs.map((tr, i) => i >= hr && (!n || S.norm(tr.textContent).includes(n)));
+    const show = match.slice();
+    if (n) trs.forEach((tr, i) => {
+      if (i < hr) return;
+      [...tr.cells].forEach((c) => { if (c.rowSpan > 1 && S.norm(c.textContent).includes(n)) for (let k = i; k < Math.min(trs.length, i + c.rowSpan); k++) show[k] = true; });
+    });
+    // 아래 줄부터 올라가며 — 앵커로 보이게 된 줄의 앵커도 이어서 보이게(엇갈린 합친 칸)
+    if (n) for (let i = trs.length - 1; i >= hr; i--) { if (!match[i] && !show[i]) continue; for (let j = i - 1; j >= hr; j--) if ([...trs[j].cells].some((c) => c.rowSpan > i - j)) show[j] = true; }
+    trs.forEach((tr, i) => { tr.classList.toggle('hide', i >= hr && !show[i]); });
     // 카드는 값만 비교(열 제목까지 보면 '평상시'처럼 제목 낱말로 찾을 때 모든 카드가 남는다)
     app.querySelectorAll('.tv-card .tcards > li').forEach((li) => { const vt = [...li.querySelectorAll('dd, .tc-h strong')].map((x) => x.textContent).join(' '); li.classList.toggle('hide', !!n && !S.norm(vt).includes(n)); });
     // 맞는 줄 수를 알려 준다(없으면 빈 표만 남아 고장처럼 보이던 것)
     const cnt = app.querySelector('.tv-count');
-    if (cnt) { const m = [...app.querySelectorAll('#tv tr')].filter((tr, i) => i > 0 && !tr.classList.contains('hide')).length; cnt.textContent = !n ? '' : m ? `‘${e.target.value.trim()}’ 들어간 줄 ${m}개` : `‘${e.target.value.trim()}’이(가) 들어간 줄이 없습니다`; }
+    if (cnt) { const m = match.filter(Boolean).length; cnt.textContent = !n ? '' : m ? `‘${e.target.value.trim()}’ 들어간 줄 ${m}개` : `‘${e.target.value.trim()}’이(가) 들어간 줄이 없습니다`; }
   });
   app.addEventListener('click', (e) => {
     const openMenu = app.querySelector('.rmenu:not([hidden])');
@@ -1954,7 +1997,7 @@
     }
     if (act === 'findbar-close') { closeFindbar(); return; }
     if (act === 'linkcopy') { copyText(location.href, '링크를 복사했습니다'); return; }
-    if (act === 'fac-retry') { facLoading = null; render(location.hash); const b = app.querySelector('.facload'); if (b) { b.setAttribute('tabindex', '-1'); b.focus(); } return; }
+    if (act === 'fac-retry') { facLoading = null; facFailAt = 0; render(location.hash); const b = app.querySelector('.facload'); if (b) { b.setAttribute('tabindex', '-1'); b.focus(); } return; }
     if (act === 'fac-more') {   // 펴 둔 카드(주소의 id)를 그대로 두고 다음 50곳
       e.preventDefault();
       const { params } = parseHash();
@@ -2030,7 +2073,7 @@
         b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
         b.innerHTML = `${on ? I.starOn : I.star}<span>${on ? '저장됨' : '저장'}</span>`;
       });
-      toast(on ? '저장했습니다 — 홈의 ‘저장한 절’에서 다시 열 수 있습니다' : '저장을 지웠습니다');
+      toast(on ? (wide(700) ? '저장했습니다 — 위 메뉴의 ‘저장’에서 다시 열 수 있습니다' : '저장했습니다 — ⋯ 메뉴의 ‘저장한 절’에서 다시 열 수 있습니다') : '저장을 지웠습니다');
       return;
     }
     if (act === 'unsave') {
